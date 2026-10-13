@@ -1,0 +1,107 @@
+<Window x:Class="GamePatchDepot.Manager.PrepareSelectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="確認收錄檔案" Width="1180" Height="760" MinWidth="1000" MinHeight="640"
+        WindowStartupLocation="CenterOwner" Background="#F1F5F9">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="確認這次要收錄的檔案" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock x:Name="SourceText" Margin="0,8,0,8" TextWrapping="Wrap" Foreground="#475569"/>
+            <TextBlock Text="勾選＝納入這次版本；取消勾選＝不發布、不刪除玩家檔案。確認後才會比對並複製變更內容。" TextWrapping="Wrap"/>
+            <TextBlock Text="舊版檔案若要刪除，請先取消「收錄」，再勾「從新版移除」。規則排除的檔案不能在這裡強制加入。" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#475569"/>
+        </StackPanel>
+        <DockPanel Grid.Row="1" Margin="0,18,0,12" LastChildFill="True">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Margin="12,0,0,0">
+                <Button Content="勾選搜尋結果" Click="SelectVisible_Click" Margin="0,0,8,0"/>
+                <Button Content="取消勾選搜尋結果" Click="ClearVisible_Click" Margin="0,0,8,0"/>
+                <Button Content="重設全部" Click="Reset_Click"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="搜尋路徑" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBox x:Name="SearchTextBox" Width="240" TextChanged="Search_TextChanged"/>
+            </StackPanel>
+        </DockPanel>
+        <DataGrid x:Name="FilesGrid" Grid.Row="2" AutoGenerateColumns="False" CanUserAddRows="False"
+                  CanUserDeleteRows="False" CanUserReorderColumns="False" IsReadOnly="True"
+                  EnableRowVirtualization="True" EnableColumnVirtualization="True" HeadersVisibility="Column"
+                  Background="White" Foreground="#172033" BorderBrush="#CBD5E1" RowBackground="White"
+                  AlternatingRowBackground="#F8FAFC" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E2E8F0"
+                  RowHeight="40" SelectionMode="Single">
+            <DataGrid.Resources>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="Background" Value="#E2E8F0"/>
+                    <Setter Property="Foreground" Value="#172033"/>
+                    <Setter Property="Padding" Value="8,12"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                </Style>
+                <Style TargetType="DataGridCell">
+                    <Setter Property="Padding" Value="6,4"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="#DBEAFE"/>
+                            <Setter Property="Foreground" Value="#172033"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="#172033"/>
+                    <Setter Property="VerticalAlignment" Value="Center"/>
+                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                </Style>
+            </DataGrid.Resources>
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="收錄" Width="58">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding Include, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      IsEnabled="{Binding CanInclude}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      AutomationProperties.Name="收錄檔案"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="相對路徑" Binding="{Binding Path}" Width="2*" MinWidth="170"/>
+                <DataGridTextColumn Header="大小" Binding="{Binding SizeText}" Width="110"/>
+                <DataGridTextColumn Header="說明" Binding="{Binding Reason}" Width="2*" MinWidth="180"/>
+                <DataGridTemplateColumn Header="從新版移除" Width="108">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding Remove, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      IsEnabled="{Binding CanRemove}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      AutomationProperties.Name="從新版移除檔案"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="處理結果" Binding="{Binding ResultText}" Width="200"/>
+            </DataGrid.Columns>
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="ToolTip">
+                        <Setter.Value>
+                            <MultiBinding StringFormat="{}{0}&#x0a;{1}">
+                                <Binding Path="Path"/>
+                                <Binding Path="Reason"/>
+                            </MultiBinding>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </DataGrid.RowStyle>
+        </DataGrid>
+        <StackPanel Grid.Row="3" Margin="0,12,0,12">
+            <TextBlock x:Name="SummaryText" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <TextBlock Text="大小是所選檔案總量，不是本次上傳量；內容相同的檔案不會再複製。" Foreground="#475569" Margin="0,4,0,0"/>
+            <TextBlock x:Name="ValidationText" Foreground="#B42318" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        </StackPanel>
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="取消，不建立" IsCancel="True" Margin="0,0,12,0"/>
+            <Button Style="{StaticResource PrimaryButtonStyle}" Click="Confirm_Click">
+                <TextBlock Text="確認並建立 Candidate" Foreground="White"/>
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>

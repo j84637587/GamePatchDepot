@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "product": "NovaStory",
+  "gameVersion": "GMS176",
+  "candidateRoot": "work/candidates",
+  "chunkRoot": "work/chunks",
+  "catalogRoot": "catalog",
+  "reportRoot": "reports",
+  "bucket": "novastory",
+  "publicBaseUrl": "https://pub-8f277bcecea84bc4b0bdf1b5514eaa0d.r2.dev",
+  "signingPublicKeyFile": "config/signing-public.pem",
+  "chunkSizeMiB": 256,
+  "keepStableReleases": 3,
+  "orphanGraceDays": 14,
+  "temporaryRetentionDays": 7,
+  "operationLeaseMinutes": 30,
+  "uploadConcurrency": 8,
+  "enableDeltaPatches": true
+}

@@ -1,0 +1,7 @@
+{
+  "excludedDirectories": [".git", ".vs", ".patch", "logs", "screenshots"],
+  "excludedFiles": ["credentials.json", "accounts.dat", ".env"],
+  "excludedExtensions": [".log", ".tmp", ".pdb", ".pem", ".key", ".pfx"],
+  "preservedPaths": [],
+  "requiredFiles": []
+}

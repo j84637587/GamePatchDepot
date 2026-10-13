@@ -1,0 +1,497 @@
+<Window x:Class="GamePatchDepot.Manager.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        Title="NovaStory Patch Manager"
+        Icon="pack://application:,,,/PatchManager;component/Assets/novastory.ico"
+        Width="1360"
+        Height="940"
+        MinWidth="1360"
+        MinHeight="940"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style x:Key="VersionCardStyle" TargetType="GroupBox" BasedOn="{StaticResource {x:Type GroupBox}}">
+            <Setter Property="Height" Value="220" />
+        </Style>
+        <Style x:Key="SourceCardStyle" TargetType="GroupBox" BasedOn="{StaticResource {x:Type GroupBox}}">
+            <Setter Property="Height" Value="192" />
+        </Style>
+        <Style x:Key="WorkflowCardStyle" TargetType="GroupBox" BasedOn="{StaticResource {x:Type GroupBox}}">
+            <Setter Property="MinHeight" Value="190" />
+        </Style>
+        <Style x:Key="ExecutionLogStyle" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="IsUndoEnabled" Value="False" />
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Background" Value="#101827" />
+            <Setter Property="Foreground" Value="#D7E1F2" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Margin" Value="0" />
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="Padding" Value="24,10" />
+            <Setter Property="Margin" Value="4,4,4,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabBorder" Background="{StaticResource SurfaceBrush}" CornerRadius="8,8,0,0" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="#DBEAFE" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <TabControl Background="{StaticResource PageBrush}" BorderThickness="0">
+    <TabItem Header="遊戲更新">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource CardBorderStyle}" Padding="18,12" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="6" CornerRadius="3" Background="{StaticResource AccentBrush}" Margin="0,1,16,1" />
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="遊戲更新" FontSize="27" FontWeight="SemiBold" />
+                    <TextBlock Text="遊戲檔案版本管理、R2 驗證與發布" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="ResetButton" Content="重設／下一版" Click="ResetButton_Click"
+                            ToolTip="重設畫面並準備下一版：自動產生版本號、清空更新說明與選用替換檔。保留來源資料夾及上傳設定，不刪本機檔案，也不變更 R2。" />
+                    <Button x:Name="RollbackButton"
+                            Content="建立退版"
+                            Click="RollbackButton_Click"
+                            ToolTip="選擇舊版本內容，建立一個版本號更高的新退版版本。" />
+                    <Button Content="操作說明" Click="HelpButton_Click" />
+                    <Border Background="#ECFDF3" BorderBrush="#BBE8C8" BorderThickness="1" CornerRadius="7" Padding="13,9" Margin="0,0,0,8">
+                        <TextBlock x:Name="CredentialStatusText" Text="憑證檢查中" Foreground="#167246" FontWeight="SemiBold" />
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Padding="14,10">
+                <StackPanel>
+                    <TextBlock Text="TEST 頻道" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="Bold" />
+                    <TextBlock x:Name="TestStatusText" Text="讀取中…" FontSize="16" FontWeight="SemiBold" Margin="0,5,0,0" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="14,10">
+                <StackPanel>
+                    <TextBlock Text="STABLE 頻道" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="Bold" />
+                    <TextBlock x:Name="StableStatusText" Text="讀取中…" FontSize="16" FontWeight="SemiBold" Margin="0,5,0,0" />
+                </StackPanel>
+            </Border>
+            <Button Grid.Column="4" x:Name="RefreshButton" Content="重新整理" Click="RefreshButton_Click" Margin="0" Padding="20,8" />
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="460" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <GroupBox Header="版本資料" Style="{StaticResource VersionCardStyle}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Release ID" />
+                                <Button Content="?" Style="{StaticResource HelpButtonStyle}"
+                                        AutomationProperties.HelpText="唯一版本識別碼，格式為 yyyy.MM.dd.流水號，例如 2026.09.24.1。已使用過的 ID 不可重複。"
+                                        ToolTip="Release ID&#x0a;&#x0a;格式：yyyy.MM.dd.流水號&#x0a;範例：2026.09.24.1&#x0a;&#x0a;每個版本只能使用一次，已建立 Candidate 或 Manifest 的 ID 不可重複。" />
+                            </StackPanel>
+                            <TextBox x:Name="ReleaseIdTextBox" TextChanged="ReleaseIdTextBox_TextChanged" />
+                            <TextBlock x:Name="ReleaseScopeText" Text="新版本支援完整客戶端；Candidate 只保存變更檔案。"
+                                       Foreground="{StaticResource MutedTextBrush}"
+                                       FontSize="12"
+                                       Margin="0,-3,0,8"
+                                       TextWrapping="Wrap" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Content Version" />
+                                        <Button Content="?" Style="{StaticResource HelpButtonStyle}"
+                                                AutomationProperties.HelpText="由遠端 Test／Stable 與本機已建立版本的最高值自動加一，使用者不能修改。"
+                                                ToolTip="Content Version&#x0a;&#x0a;UI 會讀取遠端 Test／Stable 與本機已建立版本，使用最高值加一，避免版本號重複。&#x0a;若完全沒有版本，則從 1 開始。&#x0a;&#x0a;此欄位由系統管理，使用者不能修改。" />
+                                    </StackPanel>
+                                    <TextBox x:Name="ContentVersionTextBox"
+                                             IsReadOnly="True"
+                                             Background="#F8FAFC"
+                                             AutomationProperties.HelpText="由遠端頻道自動計算，無法手動修改。" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="更新說明" />
+                                        <Button Content="?" Style="{StaticResource HelpButtonStyle}"
+                                                AutomationProperties.HelpText="簡短描述玩家會收到的更新，例如「更新 UI 資源」。不可空白。"
+                                                ToolTip="更新說明&#x0a;&#x0a;用一句話描述本次玩家會收到的變更。&#x0a;範例：更新 UI 資源。&#x0a;&#x0a;不可空白，請避免填寫無法辨識的內容，例如「測試」。" />
+                                    </StackPanel>
+                                    <TextBox x:Name="DescriptionTextBox" TextChanged="InputTextBox_TextChanged" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox Header="檔案來源" Style="{StaticResource SourceCardStyle}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="完整客戶端目錄" />
+                                <Button Content="?" Style="{StaticResource HelpButtonStyle}"
+                                        AutomationProperties.HelpText="選擇含 EXE、DLL 與資源的客戶端根目錄。Prepare 會先列出檔案讓你勾選，確認後才建立 Candidate。"
+                                        ToolTip="完整客戶端目錄&#x0a;&#x0a;選擇含遊戲 EXE、DLL、NX 和資料子目錄的根目錄，不能只選 NX 資料夾。&#x0a;&#x0a;按 Prepare 後先確認檔案清單，不想發布的取消勾選。日誌、截圖與憑證等排除規則在 config/client-files.json。" />
+                            </StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="SourceTextBox" Margin="0,4,8,10" TextChanged="InputTextBox_TextChanged" />
+                                <Button Grid.Column="1" Content="選擇" Click="BrowseSourceButton_Click" Margin="0,4,0,10" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="選用：替換玩家的 UI.nx" />
+                                <Button Content="?" Style="{StaticResource HelpButtonStyle}"
+                                        AutomationProperties.HelpText="選擇其他 NX 檔案來取代來源目錄的 UI.nx，例如 UI40.nx。留白時仍會比較並使用來源目錄的 UI.nx。"
+                                        ToolTip="UI.nx 替換檔&#x0a;&#x0a;需要用另一個檔案取代來源目錄的 UI.nx 時才選擇。&#x0a;範例：選 UI40.nx，發布名稱為 UI.nx。&#x0a;&#x0a;留白時仍會比較來源目錄的 UI.nx，有變更就會納入；不代表略過 UI 更新。" />
+                            </StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="UiReplacementTextBox" Margin="0,4,8,0" TextChanged="InputTextBox_TextChanged" />
+                                <Button Grid.Column="1" Content="選擇" Click="BrowseUiButton_Click" Margin="0,4,0,0" />
+                            </Grid>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox Style="{StaticResource WorkflowCardStyle}">
+                        <GroupBox.Header>
+                            <DockPanel LastChildFill="False">
+                                <TextBlock Text="發布流程" DockPanel.Dock="Left" VerticalAlignment="Center" />
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <TextBlock Text="同時上傳" FontSize="13" VerticalAlignment="Center" />
+                                    <ComboBox x:Name="UploadConcurrencyComboBox" Style="{StaticResource UploadConcurrencyComboBoxStyle}"
+                                              Width="64" Height="24" Margin="6,0,0,0"
+                                              FontSize="13" FontWeight="Normal" VerticalContentAlignment="Center"
+                                              IsEditable="False" SelectionChanged="UploadConcurrencyComboBox_SelectionChanged"
+                                              AutomationProperties.Name="同時上傳數"
+                                              ToolTip="選擇 1～8 個；預設 4。選完自動儲存，下次 Upload 生效。" />
+                                    <TextBlock Text="個" Margin="4,0,0,0" FontSize="13" VerticalAlignment="Center" />
+                                    <Button Content="?" Style="{StaticResource HelpButtonStyle}"
+                                            ToolTip="同時上傳數（並行數）&#x0a;&#x0a;例如選 4，最多同時處理 4 個分塊或補丁，不是保證快 4 倍。&#x0a;先用 4；磁碟或網路負擔太大可降為 2，上行頻寬有餘裕再試 8。&#x0a;&#x0a;選完自動儲存，重新開啟也會保留。下次 Upload 生效，操作途中不能修改。" />
+                                </StackPanel>
+                            </DockPanel>
+                        </GroupBox.Header>
+                        <WrapPanel x:Name="ActionPanel">
+                            <Button x:Name="PrepareButton" Style="{StaticResource StepButtonStyle}" Content="1. Prepare" Click="PrepareButton_Click" ToolTip="先掃描並顯示勾選清單，確認後才比較內容、建立 Candidate。取消勾選不會刪除玩家檔案；相同內容不再複製。" />
+                            <Button x:Name="BuildButton" Style="{StaticResource StepButtonStyle}" Content="2. Build" Click="BuildButton_Click" ToolTip="建立完整清單與分塊；有比較基準時，另外為變更檔案產生並驗證差異補丁。完整分塊仍保留作為備援。" />
+                            <Button x:Name="VerifyLocalButton" Style="{StaticResource StepButtonStyle}" Content="3. 本機驗證" Click="VerifyLocalButton_Click" ToolTip="一般更新只驗證新增或變更的檔案；首次發布、沒有基準或基準資料已清理時驗證全部檔案。要手動完整驗證可使用 verify --local。" />
+                            <Button x:Name="DiffButton" Style="{StaticResource StepButtonStyle}" Content="4. Diff" Click="DiffButton_Click" ToolTip="查看改了哪些檔案，以及玩家大約需要下載多少。" />
+                            <Button x:Name="UploadButton" Style="{StaticResource StepButtonStyle}" Content="5. Upload" Click="UploadButton_Click" ToolTip="把新的更新檔上傳到 R2；已存在的檔案不會重傳。" />
+                            <Button x:Name="VerifyDeepButton" Style="{StaticResource StepButtonStyle}" Content="6. R2 深度驗證" Click="VerifyDeepButton_Click" ToolTip="先確認 R2 與本機 Build 的清單完全一致，再下載核對每個分塊與完整檔案的 SHA-256。全部通過才允許發布；失敗或取消不沿用舊的通過紀錄。" />
+                            <Button x:Name="PromoteTestButton" Style="{StaticResource PrimaryButtonStyle}" Width="132" HorizontalContentAlignment="Left" Content="7. 發布 Test" Click="PromoteTestButton_Click" ToolTip="先讓測試人員取得這次更新。" />
+                            <Button x:Name="PromoteStableButton" Style="{StaticResource DangerButtonStyle}" Width="132" HorizontalContentAlignment="Left" Content="8. 發布 Stable" Click="PromoteStableButton_Click" ToolTip="遊戲測試正常後，正式提供給所有玩家。" />
+                        </WrapPanel>
+                    </GroupBox>
+                </StackPanel>
+            </ScrollViewer>
+
+            <GroupBox Grid.Column="2" Header="執行狀態" Margin="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <TextBlock x:Name="OperationStatusText" Text="就緒" FontSize="16" FontWeight="SemiBold" Margin="0,0,170,8"
+                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                        <Button x:Name="CancelCurrentOperationButton"
+                                Content="取消目前操作"
+                                Style="{StaticResource DangerButtonStyle}"
+                                HorizontalAlignment="Right"
+                                Margin="0,0,0,8"
+                                Click="CancelCurrentOperationButton_Click"
+                                ToolTip="中止目前正在執行的 Prepare、Build、驗證、上傳或發布操作。" />
+                    </Grid>
+                    <ProgressBar Grid.Row="1" x:Name="OperationProgressBar" Height="12" Minimum="0" Maximum="100" Margin="0,0,0,12" />
+                    <TextBox Grid.Row="2" x:Name="LogTextBox" Style="{StaticResource ExecutionLogStyle}" />
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                        <Button x:Name="RevertStepButton"
+                                Content="回退上一步"
+                                Click="RevertStepButton_Click"
+                                ToolTip="Prepare 後可捨棄 Candidate；已 Build 的不可變版本必須改用完全取消。" />
+                        <Button x:Name="CancelVersionButton"
+                                Content="完全取消版本"
+                                Style="{StaticResource DangerButtonStyle}"
+                                Click="CancelVersionButton_Click"
+                                ToolTip="停止發布此版本並保留取消紀錄；已進入頻道時會改為建立退版。" />
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+        </Grid>
+
+        <TextBlock Grid.Row="3"
+                   Margin="0,8,0,0"
+                   Foreground="{StaticResource MutedTextBrush}"
+                   Text="Stable 只應在 Test 頻道完成遊戲啟動、登入、選角與進入地圖測試後發布。" />
+    </Grid>
+    </TabItem>
+    <TabItem Header="啟動器發布">
+        <Grid Margin="18">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Border Style="{StaticResource CardBorderStyle}" Padding="18,12" Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="6" CornerRadius="3" Background="{StaticResource AccentBrush}" Margin="0,1,16,1" />
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="啟動器發布" FontSize="27" FontWeight="SemiBold" />
+                        <TextBlock Text="NovaLink 套件驗章、R2 驗證與發布" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="LauncherClearButton" Content="重設／下一版" Click="LauncherClearButton_Click" ToolTip="清除套件選擇與驗證狀態。只重設畫面，不刪除本機或 R2 檔案，也不是退版。" />
+                        <Button Content="操作說明" Click="LauncherHelpButton_Click" />
+                        <Border Background="#ECFDF3" BorderBrush="#BBE8C8" BorderThickness="1" CornerRadius="7" Padding="13,9" Margin="0,0,0,8">
+                            <TextBlock Text="{Binding Text, ElementName=CredentialStatusText}" Foreground="{Binding Foreground, ElementName=CredentialStatusText}" FontWeight="SemiBold" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+            <Grid Grid.Row="1" Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource CardBorderStyle}" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="發布位置 · 僅 STABLE" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="Bold" />
+                        <TextBlock x:Name="LauncherTargetText" FontSize="16" FontWeight="SemiBold" Margin="0,5,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="14,10">
+                    <StackPanel>
+                        <TextBlock Text="STABLE 頻道" Foreground="{StaticResource MutedTextBrush}" FontSize="12" FontWeight="Bold" />
+                        <TextBlock x:Name="LauncherRemoteText" Text="尚未查詢" FontSize="16" FontWeight="SemiBold" Margin="0,5,0,0" />
+                    </StackPanel>
+                </Border>
+                <Button Grid.Column="4" x:Name="LauncherRefreshButton" Content="重新整理" Click="LauncherRefreshButton_Click" Margin="0" Padding="20,8" />
+            </Grid>
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="460" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <GroupBox Header="版本資料" Style="{StaticResource VersionCardStyle}">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="版本／大小" />
+                                        <Button Content="?" Style="{StaticResource HelpButtonStyle}" ToolTip="驗證後自動讀取，例如 0.6.2／12.02 MiB。不能手動修改，不使用遊戲的 Release ID 或 Content Version。" />
+                                    </StackPanel>
+                                    <TextBox x:Name="LauncherVersionTextBox" IsReadOnly="True" Text="尚未驗證" Background="#F8FAFC" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="更新說明" />
+                                        <Button Content="?" Style="{StaticResource HelpButtonStyle}" ToolTip="從已簽章的套件讀取，不能在這裡修改。範例：修正啟動器下載問題。完整內容可懸停查看。" />
+                                    </StackPanel>
+                                    <TextBox x:Name="LauncherChangelogTextBox" IsReadOnly="True" Background="#F8FAFC" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Text="EXE SHA-256" />
+                            <TextBox x:Name="LauncherHashTextBox" IsReadOnly="True" TextWrapping="Wrap" FontSize="12" Height="54" Background="#F8FAFC" />
+                            <TextBlock Text="選擇下方套件並驗證後，自動帶入版本資料。" FontSize="12" Foreground="{StaticResource MutedTextBrush}" />
+                        </StackPanel>
+                    </GroupBox>
+                    <GroupBox Header="檔案來源" Style="{StaticResource SourceCardStyle}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="已簽章的套件目錄" />
+                                <Button Content="?" Style="{StaticResource HelpButtonStyle}" ToolTip="選包含 launcher 子目錄的套件根目錄。&#x0a;例如：release-packages\launcher-0.6.2&#x0a;不是選 EXE，也不是選遊戲客戶端。" />
+                            </StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="LauncherBundleTextBox" IsReadOnly="True" Margin="0,4,8,10" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                                <Button Grid.Column="1" x:Name="LauncherBrowseButton" Content="選擇" Click="LauncherBrowseButton_Click" Margin="0,4,0,10" />
+                            </Grid>
+                            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" FontSize="13" LineHeight="22" Text="例：選 launcher-0.6.2 資料夾，裡面應有 launcher 子目錄。&#x0a;只發布已簽章的完整 EXE；不需要放入私鑰。" />
+                        </StackPanel>
+                    </GroupBox>
+                    <GroupBox Style="{StaticResource WorkflowCardStyle}">
+                        <GroupBox.Header>
+                            <TextBlock Text="發布流程" MinHeight="24" />
+                        </GroupBox.Header>
+                        <StackPanel>
+                        <WrapPanel>
+                            <Button x:Name="LauncherVerifyButton" Style="{StaticResource StepButtonStyle}" Content="1. 驗證套件" Click="LauncherVerifyButton_Click" ToolTip="核對內建 NovaLink 公鑰、清單與 EXE 的簽章、大小和 SHA-256。不需要私鑰、不連線 R2。" />
+                            <Button x:Name="LauncherUploadButton" Style="{StaticResource StepButtonStyle}" Content="2. 上傳並回驗" Click="LauncherUploadButton_Click" ToolTip="上傳四個版本檔案，再由 R2 下載核對。相同檔案核對後略過，不覆寫同版號不同內容，也不切換 Stable。" />
+                            <Button x:Name="LauncherPublishButton" Width="132" HorizontalContentAlignment="Left" Content="3. 發布 Stable" Style="{StaticResource DangerButtonStyle}" Click="LauncherPublishButton_Click" ToolTip="確認已完成啟動測試後，再次回驗 R2 檔案，最後切換啟動器 Stable。遊戲頻道不變。" />
+                        </WrapPanel>
+                        <TextBlock Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" FontSize="13" LineHeight="22" Text="驗證 → 上傳並回驗 → 測試啟動 → 發布 Stable。&#x0a;上傳不會切換頻道；正式發布才提供給玩家。&#x0a;啟動器不使用遊戲的 Prepare／Build 或 Test。" />
+                        </StackPanel>
+                    </GroupBox>
+                </StackPanel>
+                </ScrollViewer>
+                <GroupBox Grid.Column="2" Header="執行狀態" Margin="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="53" />
+                        </Grid.RowDefinitions>
+                        <Grid>
+                            <TextBlock Text="{Binding Text, ElementName=OperationStatusText}" FontSize="16" FontWeight="SemiBold" Margin="0,0,170,8" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                            <Button Content="取消目前操作" Style="{StaticResource DangerButtonStyle}" HorizontalAlignment="Right" Margin="0,0,0,8"
+                                    ToolTip="停止目前操作。已完成的上傳不會刪除；發布中取消後，仍須查詢 Stable 確認結果。"
+                                    IsEnabled="{Binding IsEnabled, ElementName=CancelCurrentOperationButton}" Click="CancelCurrentOperationButton_Click" />
+                        </Grid>
+                        <ProgressBar Grid.Row="1" Height="12" Margin="0,0,0,12" Maximum="100" Value="{Binding Value, ElementName=OperationProgressBar}" IsIndeterminate="{Binding IsIndeterminate, ElementName=OperationProgressBar}" />
+                        <TextBox Grid.Row="2" x:Name="LauncherLogTextBox" Style="{StaticResource ExecutionLogStyle}" />
+                        <TextBlock Grid.Row="3" Margin="0,10,0,7" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" FontSize="13" Text="取消不會刪除已上傳檔案，也不會自動退版。要修正已發布內容，請製作更高版號。" />
+                    </Grid>
+                </GroupBox>
+            </Grid>
+            <TextBlock Grid.Row="3" Margin="0,8,0,0" Foreground="{StaticResource MutedTextBrush}" Text="Stable 只應在 EXE 測試啟動正常後發布；新公鑰的首版必須手動安裝。" />
+        </Grid>
+    </TabItem>
+    <TabItem Header="公告管理">
+      <Grid x:Name="AnnouncementPane" Margin="18">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Border Style="{StaticResource CardBorderStyle}" Padding="18,12" Margin="0,0,0,12">
+          <StackPanel><TextBlock Text="公告管理" FontSize="27" FontWeight="SemiBold"/>
+            <TextBlock Text="編輯 → 預覽 → 發布。與遊戲更新分開，不用重建啟動器。" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0"/>
+            <WrapPanel Margin="0,12,0,0">
+              <Button Content="重新整理已發布公告" Click="AnnouncementRefresh_Click"/>
+              <Button Content="新增公告" Click="AnnouncementNew_Click"/>
+              <Button Content="儲存草稿" Click="AnnouncementSave_Click"/>
+              <Button Content="預覽" Click="AnnouncementPreview_Click"/>
+              <Button Content="發布公告" Style="{StaticResource PrimaryButtonStyle}" Click="AnnouncementPublish_Click"/>
+              <Button Content="下架公告" Style="{StaticResource DangerButtonStyle}" Click="AnnouncementWithdraw_Click"/>
+            </WrapPanel>
+            <TextBlock x:Name="AnnouncementStatusText" Text="請先重新整理已發布公告，再發布或下架。" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+        <Grid Grid.Row="1">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <GroupBox Header="已發布公告（包含下架紀錄）">
+            <ListBox x:Name="AnnouncementList" SelectionChanged="AnnouncementList_SelectionChanged">
+              <ListBox.ItemTemplate>
+                <DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" /></DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </GroupBox>
+          <GroupBox Grid.Column="2" Header="編輯公告">
+            <Grid>
+              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+              <TextBlock x:Name="AnnouncementIdentityText" Text="新公告，ID 自動產生" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,8"/>
+              <StackPanel Grid.Row="1"><TextBlock Text="標題"/><TextBox x:Name="AnnouncementTitleTextBox" MaxLength="120" Margin="0,6,0,10"/></StackPanel>
+              <WrapPanel Grid.Row="2" Margin="0,0,0,10">
+                <TextBlock Text="分類" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <ComboBox x:Name="AnnouncementCategoryBox" Width="160" SelectedIndex="0"><ComboBoxItem Content="一般公告" Tag="notice"/><ComboBoxItem Content="維護公告" Tag="maintenance"/><ComboBoxItem Content="更新公告" Tag="update"/></ComboBox>
+                <CheckBox x:Name="AnnouncementPopupBox" Content="開啟啟動器時彈出" Margin="18,0,0,0" VerticalAlignment="Center"/>
+                <CheckBox x:Name="AnnouncementRemindBox" Content="修改後再次提醒" Margin="18,0,0,0" VerticalAlignment="Center"/>
+              </WrapPanel>
+              <TextBox Grid.Row="3" x:Name="AnnouncementBodyTextBox" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxLength="16000"/>
+              <StackPanel Grid.Row="4" Margin="0,12,0,0">
+                <TextBlock Text="可使用分段、標題、粗體、連結與卡片。未勾選再次提醒時，已讀玩家不會因修正錯字再次彈窗。" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                <Expander x:Name="AnnouncementExamplesExpander" Header="格式與範例（展開後可複製）" Margin="0,8,0,0" IsExpanded="False">
+                  <ScrollViewer MaxHeight="230" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="0,8,8,0">
+                      <TextBlock Text="空一行＝新段落；## ＋空格＝小標題；**文字**＝粗體；[文字](https://網址)＝連結。" TextWrapping="Wrap"/>
+                      <TextBlock Text="卡片：notice＝一般提示；maintenance＝藍色維護標記；important＝紅色重點。開頭與結尾的 ::: 必須各占一行，卡片不能巢狀。" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                      <TextBlock Text="下方是可複製的完整範例：選取需要的部分，Ctrl+C，再貼到上方內容欄。請修改時間、內容與連結；example.com 是示範網址。" TextWrapping="Wrap" Margin="0,6,0,8"/>
+                      <TextBox x:Name="AnnouncementExampleTextBox" IsReadOnly="True" IsUndoEnabled="False" AcceptsReturn="True" TextWrapping="Wrap">
+                        <TextBox.Text><sys:String xml:space="preserve">歡迎來到 **NovaStory**！
+
+## 本次更新
+新增活動與修正已知問題。
+詳細內容請見 [更新說明](https://example.com/updates)。
+
+:::notice 活動資訊
+活動期間登入遊戲，即可參加活動。
+:::
+
+:::maintenance 維護時間
+預計 10:00～12:00 維護，請提前登出。
+:::
+
+:::important 重要提醒
+更新前請 **關閉遊戲**，並保留足夠磁碟空間。
+:::</sys:String></TextBox.Text>
+                      </TextBox>
+                      <TextBlock Text="可重複加入段落與卡片。只支援以上格式，不支援 HTML、自訂顏色、圖片或完整 Markdown。按「預覽」可確認格式；字型與配色會依 Patch Manager／NovaLink 的介面樣式呈現。" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,8,0,0"/>
+                    </StackPanel>
+                  </ScrollViewer>
+                </Expander>
+              </StackPanel>
+            </Grid>
+          </GroupBox>
+        </Grid>
+        <TextBlock Grid.Row="2" Text="發布失敗或取消不保證遠端未變更，請重新整理確認結果；下架保留紀錄，不刪除歷史。" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" Margin="0,12,0,0"/>
+      </Grid>
+    </TabItem>
+    </TabControl>
+</Window>

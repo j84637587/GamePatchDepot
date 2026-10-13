@@ -1,0 +1,11 @@
+{
+  "releaseId": "2026.09.26.1",
+  "builtAt": "2026-09-26T15:49:04.6501516+00:00",
+  "fileCount": 55,
+  "totalFileBytes": 12280427537,
+  "uniqueChunkCount": 94,
+  "uniqueChunkBytes": 12280427537,
+  "newLocalChunkCount": 94,
+  "newLocalChunkBytes": 12280427537,
+  "manifestSha256": "06db06dfdbd7a902c8e4b67afba03cae2e120f8b5f09adcf2b52c5b0f3d47327"
+}

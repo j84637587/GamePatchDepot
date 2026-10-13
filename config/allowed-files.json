@@ -1,0 +1,20 @@
+{
+  "files": [
+    "Base.nx",
+    "Character.nx",
+    "Effect.nx",
+    "Etc.nx",
+    "Item.nx",
+    "Map.nx",
+    "Mob.nx",
+    "Morph.nx",
+    "Npc.nx",
+    "Quest.nx",
+    "Reactor.nx",
+    "Skill.nx",
+    "Sound.nx",
+    "String.nx",
+    "TamingMob.nx",
+    "UI.nx"
+  ]
+}

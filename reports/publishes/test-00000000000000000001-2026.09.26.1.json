@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "channel": "test",
+  "generation": 1,
+  "releaseId": "2026.09.26.1",
+  "contentVersion": 1,
+  "manifestKey": "manifests/2026.09.26.1.json",
+  "manifestSha256": "06db06dfdbd7a902c8e4b67afba03cae2e120f8b5f09adcf2b52c5b0f3d47327",
+  "publishedAt": "2026-09-26T18:50:48.933025+00:00"
+}

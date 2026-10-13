@@ -1,0 +1,13 @@
+{
+  "releaseId": "2026.10.03.1",
+  "builtAt": "2026-10-03T13:11:43.1342408+00:00",
+  "fileCount": 55,
+  "totalFileBytes": 12280440337,
+  "uniqueChunkCount": 94,
+  "uniqueChunkBytes": 12280440337,
+  "newLocalChunkCount": 1,
+  "newLocalChunkBytes": 3087872,
+  "manifestSha256": "76fd1cace6fb9f362b6709854f35599f5c389c3065e8e3527bf3c92dbc5b03ee",
+  "patchCount": 1,
+  "patchBytes": 1221802
+}

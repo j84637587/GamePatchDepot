@@ -1,0 +1,125 @@
+name: Upload NovaLink launcher candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      novalink_tag:
+        description: "Private NovaLink release tag, for example v1.0.0"
+        required: true
+        type: string
+
+concurrency:
+  group: launcher-r2-production
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  NOVALINK_REPOSITORY: j84637587/novalink
+
+jobs:
+  upload:
+    name: Verify, upload, and read back
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Restore and build publisher
+        shell: pwsh
+        run: |
+          dotnet restore GamePatchDepot.slnx --locked-mode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build src/PatchPublisher/PatchPublisher.csproj --configuration Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Download signed NovaLink bundle
+        id: bundle
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.NOVALINK_RELEASE_TOKEN }}
+          NOVALINK_TAG: ${{ inputs.novalink_tag }}
+        run: |
+          if (-not $env:GH_TOKEN) { throw "NOVALINK_RELEASE_TOKEN is not configured." }
+          if ($env:NOVALINK_TAG -notmatch '^v((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$') {
+            throw "novalink_tag must look like v1.0.0."
+          }
+          $version = $Matches[1]
+          $name = "NovaLink-launcher-$version"
+          New-Item -ItemType Directory -Path download,bundle | Out-Null
+          gh release download $env:NOVALINK_TAG `
+            --repo $env:NOVALINK_REPOSITORY `
+            --pattern "$name.zip" `
+            --pattern "$name.bundle-sha256" `
+            --dir download
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          Expand-Archive -LiteralPath "download/$name.zip" -DestinationPath bundle
+          $expected = (Get-Content "download/$name.bundle-sha256" -Raw).Trim().ToLowerInvariant()
+          if ($expected -notmatch '^[0-9a-f]{64}$') { throw "Release bundle digest is invalid." }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "path=$((Resolve-Path bundle).Path)" >> $env:GITHUB_OUTPUT
+          "digest=$expected" >> $env:GITHUB_OUTPUT
+
+      - name: Verify signed bundle
+        shell: pwsh
+        env:
+          BUNDLE_PATH: ${{ steps.bundle.outputs.path }}
+          EXPECTED_BUNDLE_SHA256: ${{ steps.bundle.outputs.digest }}
+        run: |
+          $output = & dotnet run --project src/PatchPublisher --configuration Release --no-build -- `
+            launcher-verify --bundle $env:BUNDLE_PATH 2>&1
+          $exit = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($exit -ne 0) { exit $exit }
+
+          $line = @($output | ForEach-Object { $_.ToString() } | Where-Object { $_.StartsWith('launcher-package:') })[-1]
+          if (-not $line) { throw "PatchPublisher did not report launcher-package metadata." }
+          $metadata = ($line.Substring('launcher-package:'.Length) | ConvertFrom-Json)
+          if ($metadata.BundleSha256.ToLowerInvariant() -ne $env:EXPECTED_BUNDLE_SHA256) {
+            throw "Verified bundle digest does not match the private release."
+          }
+
+      - name: Upload immutable files and read them back
+        shell: pwsh
+        env:
+          BUNDLE_PATH: ${{ steps.bundle.outputs.path }}
+          PATCH_R2_ACCOUNT_ID: ${{ secrets.PATCH_R2_ACCOUNT_ID }}
+          PATCH_R2_ACCESS_KEY_ID: ${{ secrets.PATCH_R2_ACCESS_KEY_ID }}
+          PATCH_R2_SECRET_ACCESS_KEY: ${{ secrets.PATCH_R2_SECRET_ACCESS_KEY }}
+        run: |
+          if (-not $env:PATCH_R2_ACCOUNT_ID -or -not $env:PATCH_R2_ACCESS_KEY_ID -or -not $env:PATCH_R2_SECRET_ACCESS_KEY) {
+            throw "R2 deployment secrets are not configured."
+          }
+          dotnet run --project src/PatchPublisher --configuration Release --no-build -- `
+            launcher-upload --bundle $env:BUNDLE_PATH
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project src/PatchPublisher --configuration Release --no-build -- launcher-status
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Write deployment receipt
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.bundle.outputs.version }}
+          BUNDLE_SHA256: ${{ steps.bundle.outputs.digest }}
+          NOVALINK_TAG: ${{ inputs.novalink_tag }}
+        run: |
+          @"
+          ## NovaLink launcher candidate uploaded
+
+          - NovaLink tag: ``$env:NOVALINK_TAG``
+          - Version: ``$env:VERSION``
+          - Bundle SHA-256: ``$env:BUNDLE_SHA256``
+          - GamePatchDepot commit: ``${{ github.sha }}``
+          - Workflow run: ``${{ github.run_id }}``
+          - Stable was not changed.
+          "@ >> $env:GITHUB_STEP_SUMMARY

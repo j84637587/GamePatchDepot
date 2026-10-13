@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/PatchPublisher/PatchPublisher.csproj" />
+  <Project Path="src/PatchManager/PatchManager.csproj" />
+  <Project Path="tests/PatchPublisher.Tests/PatchPublisher.Tests.csproj" />
+  <Project Path="tests/PatchManager.SmokeTests/PatchManager.SmokeTests.csproj" />
+</Solution>

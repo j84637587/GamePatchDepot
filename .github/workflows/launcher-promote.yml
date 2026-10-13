@@ -1,0 +1,179 @@
+name: Promote NovaLink launcher to stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      novalink_tag:
+        description: "Private NovaLink release tag, for example v1.0.0"
+        required: true
+        type: string
+      bundle_sha256:
+        description: "Bundle SHA-256 reported by the upload workflow"
+        required: true
+        type: string
+      confirm_version:
+        description: "Type the version without v to confirm Stable promotion"
+        required: true
+        type: string
+
+concurrency:
+  group: launcher-r2-production
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  NOVALINK_REPOSITORY: j84637587/novalink
+
+jobs:
+  promote:
+    name: Reverify and promote stable
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Restore and build publisher
+        shell: pwsh
+        run: |
+          dotnet restore GamePatchDepot.slnx --locked-mode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build src/PatchPublisher/PatchPublisher.csproj --configuration Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Download and confirm signed NovaLink bundle
+        id: bundle
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.NOVALINK_RELEASE_TOKEN }}
+          NOVALINK_TAG: ${{ inputs.novalink_tag }}
+          APPROVED_BUNDLE_SHA256: ${{ inputs.bundle_sha256 }}
+          CONFIRM_VERSION: ${{ inputs.confirm_version }}
+        run: |
+          if (-not $env:GH_TOKEN) { throw "NOVALINK_RELEASE_TOKEN is not configured." }
+          if ($env:NOVALINK_TAG -notmatch '^v((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$') {
+            throw "novalink_tag must look like v1.0.0."
+          }
+          $version = $Matches[1]
+          if ($env:CONFIRM_VERSION -ne $version) { throw "confirm_version does not match $version." }
+          $approved = $env:APPROVED_BUNDLE_SHA256.Trim().ToLowerInvariant()
+          if ($approved -notmatch '^[0-9a-f]{64}$') { throw "bundle_sha256 must contain 64 lowercase or uppercase hex characters." }
+          $isPrerelease = gh release view $env:NOVALINK_TAG --repo $env:NOVALINK_REPOSITORY --json isPrerelease --jq .isPrerelease
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($isPrerelease -eq 'true') { throw "A NovaLink prerelease cannot be promoted to Stable." }
+
+          $name = "NovaLink-launcher-$version"
+          New-Item -ItemType Directory -Path download,bundle | Out-Null
+          gh release download $env:NOVALINK_TAG `
+            --repo $env:NOVALINK_REPOSITORY `
+            --pattern "$name.zip" `
+            --pattern "$name.bundle-sha256" `
+            --dir download
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          Expand-Archive -LiteralPath "download/$name.zip" -DestinationPath bundle
+          $released = (Get-Content "download/$name.bundle-sha256" -Raw).Trim().ToLowerInvariant()
+          if ($released -ne $approved) { throw "Approved digest does not match the private release digest." }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "path=$((Resolve-Path bundle).Path)" >> $env:GITHUB_OUTPUT
+          "digest=$approved" >> $env:GITHUB_OUTPUT
+
+      - name: Verify approved bundle again
+        shell: pwsh
+        env:
+          BUNDLE_PATH: ${{ steps.bundle.outputs.path }}
+          EXPECTED_BUNDLE_SHA256: ${{ steps.bundle.outputs.digest }}
+        run: |
+          $output = & dotnet run --project src/PatchPublisher --configuration Release --no-build -- `
+            launcher-verify --bundle $env:BUNDLE_PATH 2>&1
+          $exit = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($exit -ne 0) { exit $exit }
+
+          $line = @($output | ForEach-Object { $_.ToString() } | Where-Object { $_.StartsWith('launcher-package:') })[-1]
+          if (-not $line) { throw "PatchPublisher did not report launcher-package metadata." }
+          $metadata = ($line.Substring('launcher-package:'.Length) | ConvertFrom-Json)
+          if ($metadata.BundleSha256.ToLowerInvariant() -ne $env:EXPECTED_BUNDLE_SHA256) {
+            throw "Verified bundle digest does not match the approved digest."
+          }
+
+      - name: Promote Stable with GamePatchDepot
+        shell: pwsh
+        env:
+          BUNDLE_PATH: ${{ steps.bundle.outputs.path }}
+          BUNDLE_SHA256: ${{ steps.bundle.outputs.digest }}
+          PATCH_R2_ACCOUNT_ID: ${{ secrets.PATCH_R2_ACCOUNT_ID }}
+          PATCH_R2_ACCESS_KEY_ID: ${{ secrets.PATCH_R2_ACCESS_KEY_ID }}
+          PATCH_R2_SECRET_ACCESS_KEY: ${{ secrets.PATCH_R2_SECRET_ACCESS_KEY }}
+        run: |
+          if (-not $env:PATCH_R2_ACCOUNT_ID -or -not $env:PATCH_R2_ACCESS_KEY_ID -or -not $env:PATCH_R2_SECRET_ACCESS_KEY) {
+            throw "R2 deployment secrets are not configured."
+          }
+          dotnet run --project src/PatchPublisher --configuration Release --no-build -- `
+            launcher-publish --bundle $env:BUNDLE_PATH --expected-bundle $env:BUNDLE_SHA256 --confirm
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify the player-facing R2 endpoint
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.bundle.outputs.version }}
+          EXPECTED_BUNDLE_SHA256: ${{ steps.bundle.outputs.digest }}
+        run: |
+          $config = Get-Content config/product.json -Raw | ConvertFrom-Json
+          $base = $config.publicBaseUrl.TrimEnd('/')
+          $root = Join-Path $PWD "public-bundle"
+          $release = Join-Path $root "launcher/releases/$($env:VERSION)"
+          $channel = Join-Path $root "launcher/channels"
+          New-Item -ItemType Directory -Path $release,$channel | Out-Null
+
+          $stablePath = Join-Path $channel "stable.json"
+          $matched = $false
+          foreach ($attempt in 1..6) {
+            curl.exe --fail --silent --show-error --location `
+              "$base/launcher/channels/stable.json?run=${{ github.run_id }}-$attempt" `
+              --output $stablePath
+            if ($LASTEXITCODE -eq 0) {
+              $actual = (Get-FileHash $stablePath -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($actual -eq $env:EXPECTED_BUNDLE_SHA256) { $matched = $true; break }
+            }
+            Start-Sleep -Seconds 5
+          }
+          if (-not $matched) { throw "The public stable.json did not reach the approved digest." }
+
+          foreach ($file in @('NovaLink.exe', 'NovaLink.exe.sig', 'manifest.json', 'manifest.json.sig')) {
+            curl.exe --fail --silent --show-error --location `
+              "$base/launcher/releases/$($env:VERSION)/$file" `
+              --output (Join-Path $release $file)
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+          dotnet run --project src/PatchPublisher --configuration Release --no-build -- `
+            launcher-verify --bundle $root
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Write deployment receipt
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.bundle.outputs.version }}
+          BUNDLE_SHA256: ${{ steps.bundle.outputs.digest }}
+          NOVALINK_TAG: ${{ inputs.novalink_tag }}
+        run: |
+          @"
+          ## NovaLink launcher promoted to Stable
+
+          - NovaLink tag: ``$env:NOVALINK_TAG``
+          - Version: ``$env:VERSION``
+          - Bundle SHA-256: ``$env:BUNDLE_SHA256``
+          - GamePatchDepot commit: ``${{ github.sha }}``
+          - Workflow run: ``${{ github.run_id }}``
+          - Player-facing R2 verification: passed
+          "@ >> $env:GITHUB_STEP_SUMMARY

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>PatchPublisher</AssemblyName>
+    <RootNamespace>GamePatchDepot</RootNamespace>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" Version="4.0.103.3" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
+    <InternalsVisibleTo Include="PatchPublisher.Tests" />
+  </ItemGroup>
+</Project>

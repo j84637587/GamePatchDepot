@@ -1,0 +1,15 @@
+bin/
+obj/
+.vs/
+.idea/
+TestResults/
+dist/
+work/*
+!work/.gitkeep
+private/
+credentials.json
+*.user
+*.suo
+*.tmp
+*.part
+tools/hdiffpatch/*.exe
