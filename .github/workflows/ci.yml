@@ -32,5 +32,9 @@ jobs:
       - name: Build
         run: dotnet build GamePatchDepot.slnx --configuration Release --no-restore
 
+      - name: Install verified HDiffPatch tools
+        shell: pwsh
+        run: ./setup-patch-tools.ps1
+
       - name: Test
         run: dotnet test GamePatchDepot.slnx --configuration Release --no-build
