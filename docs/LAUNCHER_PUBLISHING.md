@@ -73,9 +73,9 @@ Repository Secrets：
 
 ```text
 NOVALINK_RELEASE_TOKEN
-PATCH_R2_ACCOUNT_ID
-PATCH_R2_ACCESS_KEY_ID
-PATCH_R2_SECRET_ACCESS_KEY
+R2_ACCOUNT_ID
+R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY
 ```
 
 `NOVALINK_RELEASE_TOKEN` 只需讀取 `j84637587/novalink` Private Release。R2 Token 使用指定 bucket 的 Object Read & Write 權限。NovaLink 更新私鑰不放在 GamePatchDepot。

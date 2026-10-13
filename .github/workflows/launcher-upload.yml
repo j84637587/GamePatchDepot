@@ -93,9 +93,9 @@ jobs:
         shell: pwsh
         env:
           BUNDLE_PATH: ${{ steps.bundle.outputs.path }}
-          PATCH_R2_ACCOUNT_ID: ${{ secrets.PATCH_R2_ACCOUNT_ID }}
-          PATCH_R2_ACCESS_KEY_ID: ${{ secrets.PATCH_R2_ACCESS_KEY_ID }}
-          PATCH_R2_SECRET_ACCESS_KEY: ${{ secrets.PATCH_R2_SECRET_ACCESS_KEY }}
+          PATCH_R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          PATCH_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          PATCH_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
           if (-not $env:PATCH_R2_ACCOUNT_ID -or -not $env:PATCH_R2_ACCESS_KEY_ID -or -not $env:PATCH_R2_SECRET_ACCESS_KEY) {
             throw "R2 deployment secrets are not configured."
