@@ -4,7 +4,7 @@ Game Patch Depot 是 GMS v176 遊戲檔案的版本、分塊、Cloudflare R2 發
 
 管理 UI `PatchManager` 與命令列 `PatchPublisher` 使用同一套發布核心。不需要資料庫、Web 後臺或 AWS CLI。
 
-NovaLink 本身的更新請使用獨立「啟動器發布」分頁：[三步操作說明](docs/LAUNCHER_PUBLISHING.md)。選擇已簽章套件 → 驗證 → 上傳並回驗 → 確認正式發布；遊戲與啟動器不混用版本或金鑰。
+NovaLink 本身的更新請看 [NovaLink 發布 SOP](docs/LAUNCHER_PUBLISHING.md)，可使用 GitHub Actions 或「啟動器發布」分頁。先上傳並回驗，確認後才發布 Stable；遊戲與啟動器不混用版本或金鑰。
 
 ## 已完成能力
 
