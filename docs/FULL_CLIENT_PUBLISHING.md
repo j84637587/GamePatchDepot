@@ -6,12 +6,12 @@
 
 1. 準備可以正常執行的客戶端根目錄，包含 EXE、DLL、NX 與必要子目錄。不要選只有 NX 的資料夾。
 2. 檢查 `config/client-files.json` 的排除、保留與必備檔案設定。
-3. 打開 PatchManager，使用新的 Release ID，選擇「完整客戶端目錄」。若畫面回到舊 Candidate，先完成或取消舊版本，再建立新版本；既有 NX Candidate 不會自動變成完整客戶端。
+3. 打開 PatchManager，使用新的 Release ID，選擇「完整客戶端目錄」。首次發布／遷移時填寫已發布相容版本的「最低 NovaLink 版本」。若畫面回到舊 Candidate，先完成或取消舊版本，再建立新版本；既有 NX Candidate 不會自動變成完整客戶端。
 4. 按 Prepare，先在檔案清單勾選收錄項目。不想發布的取消勾選，再按「確認並建立 Candidate」。確認前不會複製檔案；取消視窗不會建立 Candidate。來源目錄本身不會被改動。
 5. 確認後 Build，再執行本機驗證與 Diff。一般更新的本機驗證只讀新增或變更的檔案；第一版或沒有基準資料時讀取全部。若有檔案要移除，UI 會在 Build 前要求確認。
 6. 確認內容後才 Upload、R2 深度驗證、發布 Test。完整客戶端玩家端串接及遊戲測試完成後再發布 Stable。
 
-目前只檢查「至少有一個 EXE」與你設定的必備檔案，不能據此證明客戶端能正常遊玩。請把真正的遊戲 EXE 與必要 DLL 加入 `requiredFiles`，並保留遊戲測試流程。
+工具會檢查 `gameExecutable` 指定的遊戲主程式與必備檔案，但不能據此證明可以正常遊玩。請把必要 DLL 加入 `requiredFiles`，並保留遊戲測試流程。
 
 ## 收錄規則
 
@@ -19,16 +19,14 @@
 
 ### 勾選範例
 
-| 檔案 | 怎麼選 | 結果 |
-|---|---|---|
-| `Game.exe`、`data/UI.nx` | 保持「收錄」勾選 | 納入完整版本；相同內容不再複製 |
-| `settings.ini` | 取消「收錄」 | 不發布；舊版若已追蹤，改為保留玩家現有檔案 |
-| `obsolete.dll`（舊版有） | 取消「收錄」，再勾「從新版移除」 | 列入新版刪除清單，不刪除本機來源 |
-| `secret.pem` | 規則排除，不能勾選 | 不收錄；如確有需要，先修改規則再重新掃描 |
+- 遊戲主程式與 `data/UI.nx`：保持「收錄」；相同內容不再複製。
+- `settings.ini`：取消「收錄」後停止發布，保留玩家現有檔案。
+- 舊版的 `obsolete.dll`：取消「收錄」並勾「從新版移除」，列入新版刪除清單；不刪本機來源。
+- `secret.pem`：由規則排除；確有需要時，先修改規則再重新掃描。
 
 「收錄」是完整版本應有的檔案，不是只有本次修改的檔案。沒改動的遊戲檔案也要保持勾選。
 
-可搜尋相對路徑，對搜尋結果批次勾選／取消，或重設全部。畫面的容量是所選檔案總量，不是新增上傳量。檔名與說明太長時可懸停查看。至少須保留一個 EXE，以及 `requiredFiles` 指定的檔案。
+可搜尋相對路徑，對搜尋結果批次勾選／取消，或重設全部。畫面的容量是所選檔案總量，不是新增上傳量。檔名與說明太長時可懸停查看。必須保留 `gameExecutable` 指定的遊戲主程式與 `requiredFiles` 指定的檔案。
 
 預覽只讀取清單、大小與修改時間，不先雜湊大型檔案。確認時會重新檢查來源、替換檔、規則與基準；若清單、大小或修改時間有變化，會要求重新掃描。這不是對檔案內容的鎖定，Prepare 期間仍不要修改來源。
 
@@ -64,22 +62,25 @@ Build 輸出的 schemaVersion 2 Manifest 記錄完整版本。未變更的檔案
 
 `preserve` 記錄已排除或指定保留的路徑；若既有受管設定改成保留，會停止追蹤但不加入 `delete`。未重新納入管理的保留紀錄會沿用至後續版本。玩家端實作時必須遵守它，尤其從很舊的版本直接更新時；目前尚未實作玩家端刪除或套用。
 
-第一次由 NX 基準轉成完整客戶端時，相同路徑且相同內容的 NX 可重用既有 chunks。新 schema 沿用目前 R2 路徑、簽章與單調遞增版本；沒有新增 bucket 或自動切換頻道。分塊仍使用 `product.json` 中的既有設定，目前為 256 MiB。
+舊 NX 清單沒有遊戲主程式雜湊，不能直接當作 Prepare 的基準。請勾「建立新完整基準」（CLI 不加 `--base`），選用本次已驗證支援新流程的編譯產物，不可選舊遊戲目錄。相同內容的 NX 分塊仍會重用，不必重新上傳。重設下一版時會自動取消這個選項，恢復一般差異更新。
 
-目前 UI 已有完整客戶端版本可退版時，只列出完整客戶端目標，避免誤選只有 NX 的版本。CLI 維護舊 NX 時仍可明確指定舊版；操作人員不可把 NX-only 清單當作完整客戶端退版。
+完整清單沿用目前 R2 路徑、簽章與單調遞增版本；沒有新增 bucket 或自動切換頻道。分塊仍使用 `product.json` 中的既有設定，目前為 256 MiB。
+
+UI 與 CLI 只允許回滾至支援新交接的完整客戶端；舊 NX 清單及舊票證協定只能供歷史查驗。
 
 ## CLI 範例
 
 下面的來源路徑及版本號是示意，請換成實際值；第一次發布不加 `--base`。
 
 ```powershell
-.\patch.ps1 prepare --full-client --release 2026.09.26.1 --content-version 4 --source F:\ClientRelease --description "feat(client): 完整客戶端"
+$launcherVersion = Read-Host "已發布且支援新登入流程的 NovaLink 版本（高於 1.1.0）"
+.\patch.ps1 prepare --full-client --minimum-launcher-version $launcherVersion --release 2026.09.26.1 --content-version 4 --source F:\ClientRelease --description "feat(client): 完整客戶端"
 .\patch.ps1 build --release 2026.09.26.1
 .\patch.ps1 verify --release 2026.09.26.1 --local
 .\patch.ps1 diff --release 2026.09.26.1 --against stable
 ```
 
-後續 Prepare 加 `--base <已發布版本>`，或使用 UI 自動選擇發布基準。CLI 不加 `--full-client` 會維持舊 NX 模式。
+後續 Prepare 加 `--base <已發布版本>`，或使用 UI 自動選擇發布基準。每次 Prepare 都必須加 `--full-client`；舊 NX 模式已停止發布。
 
 更新版可用 `verify --release <版本> --local --changed`，依 Candidate 記錄的基準與兩份已簽章 Manifest，只驗證新增、內容或分塊配置變更的檔案；補丁也會驗證。無 Candidate、無基準及第一版自動完整驗證。`verify --local` 始終完整驗證所有檔案，適合定期檢查本機舊分塊。變更驗證通過不代表未變更的本機分塊沒有損壞；後續 R2 深度驗證仍核對雲端完整版本。
 
@@ -103,11 +104,16 @@ Upload 後按「R2 深度驗證」。工具會先驗證本機與遠端 Manifest 
 
 ## NovaStory 冷啟動票證
 
-新交接方式會等遊戲載入完成後才申請登入票證，避免慢速硬碟載入期間就耗掉 60 秒有效期。
+只保留「遊戲準備好後才申請票證」流程，避免載入時間消耗 60 秒有效期。單開遊戲的密碼登入備案不受影響。
 
-- 先發布包含新流程的 NovaLink，使用新的正式版本號；再準備支援 `--novalink-ticket-ready-stdin` 的新版 NovaStory。
-- Prepare 完成、Build 之前，在 Candidate 的 `release-info.json` 同時設定 `"launcherTicketProtocol": 2`，以及 `minimumLauncherVersion`：填入剛發布、支援新流程的 NovaLink 實際版本號。不要保留預設 `1.0.0` 或沿用不支援此流程的舊版號。然後照原流程 Build、驗證及發布 Test。
-- 測試確認後再發布 Stable。舊遊戲請維持 `1` 或不填；請勿直接修改已簽章的 Manifest。回滾會沿用目標版本的協定。
-- 若遊戲檔案完全沒變、只需啟用或停用新協定，使用 CLI 的 `prepare`，保留正常的新版 Release ID／contentVersion／source／base，另加 `--launcher-ticket-protocol 2` 或 `1`。這會建立只調整協定的 Candidate；啟用 `2` 時，Build 前仍須依上一點設定最低 NovaLink 版本。檔案與協定都沒有變更時仍會拒絕。
+- 先用新的正式版號發布支援新流程的 NovaLink，再準備支援 `--novalink-ticket-ready-stdin` 的新版 NovaStory。
+- 首次發布或從舊協定遷移必須用完整客戶端（CLI 加 `--full-client`），包含新版遊戲 EXE；只更新 NX 不能完成遷移。
+- 新發布統一使用完整客戶端清單；後續仍只處理有變動的檔案與分塊，不會每次重傳整包。舊 NX 清單只供歷史查驗／遷移比較，不能發布或回滾啟用。
+- 從舊協定遷移時，遊戲主程式內容必須有變更；Prepare 與 Build 都會檢查 `config/product.json` 的 `gameExecutable`（預設 `NovaStory.exe`），只更新輔助 EXE 或修改協定欄位都不能通過。
+- Prepare 固定產生 `launcherTicketProtocol: 2`。首次發布／遷移時，在畫面的「最低 NovaLink 版本」填已發布、支援新流程的實際版本（必須高於不支援的 `1.1.0`）；CLI 用 `--minimum-launcher-version <實際版本>`，不用手改 JSON。後續留空可沿用相容基準。
+- 後續不能降低基準要求的最低版本；若只需提高最低版本，不改遊戲檔案也能建立修正版。
+- 依原流程 Build、驗證及發布 Test，遊玩確認後才發布 Stable。不可只把舊 EXE 的協定欄位改成 2；請先確認 EXE 已包含新交接實作。
 
-協定欄位會納入 Manifest 簽章；它是發布者對遊戲能力的聲明，工具無法代替實際遊戲驗證。第一次未設定時使用舊交接方式，以相容已發布版本；後續 Candidate 自動沿用基準版本的協定與最低 NovaLink 版本，不必每次重填。若要降回舊模式，需在 Build 前明確設為 `1`。舊模式不新增 Manifest 欄位，以保留既有不可變清單的相容性。
+舊 Candidate（協定 1 或未填）不再允許 Build；歷史 Manifest 可供驗證與比較，但不可重新發布頻道或作為回滾目標。Prepare、Build、發布與回滾均會阻擋不相容的最低 NovaLink 版本；工具無法代替維運確認填寫版本確實已發布且包含新交接。協定固定為 2，不提供降回舊模式的選項。新舊兩端需要搭配發布，既有安裝不會因程式碼合併就自動升級。
+
+若舊頻道先前寫入成功、但歷史紀錄未完成，可重試目前相同版本以補齊紀錄；這不會改寫頻道或重新切換至舊套件。

@@ -1,5 +1,7 @@
 # Game Patch Depot：檔案儲存、版本管控與發布 SOP
 
+> 歷史設計紀錄：本文的 NX-only 發布步驟與檢查表已停用，不可作為現行 SOP。日常操作請看 [快速指南](QUICKSTART.md)，CLI 請看 [完整客戶端發布操作](FULL_CLIENT_PUBLISHING.md)。
+
 > 文件版本：1.1  
 > 狀態：建議採用的第一版基準  
 > 適用產品：GMS v176 NX 資源  

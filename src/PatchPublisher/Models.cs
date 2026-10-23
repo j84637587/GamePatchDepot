@@ -7,6 +7,7 @@ public sealed class ProductConfig
     public int SchemaVersion { get; init; } = 1;
     public required string Product { get; init; }
     public required string GameVersion { get; init; }
+    public string GameExecutable { get; init; } = "NovaStory.exe";
     public required string CandidateRoot { get; init; }
     public required string ChunkRoot { get; init; }
     public required string CatalogRoot { get; init; }

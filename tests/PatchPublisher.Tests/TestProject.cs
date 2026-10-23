@@ -17,7 +17,7 @@ internal sealed class TestProject : IAsyncDisposable
     public string PrivateKeyPath { get; }
     public SigningService Signer => new(Context.PublicKeyPath, PrivateKeyPath);
 
-    public static async Task<TestProject> CreateAsync(string[] allowedFiles, int chunkSizeMiB = 1, bool enableDeltaPatches = false, int uploadConcurrency = 4)
+    public static async Task<TestProject> CreateAsync(string[] allowedFiles, int chunkSizeMiB = 1, bool enableDeltaPatches = false, int uploadConcurrency = 4, string gameExecutable = "Game.exe")
     {
         string root = Path.Combine(Path.GetTempPath(), "GamePatchDepot.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "config"));
@@ -27,6 +27,7 @@ internal sealed class TestProject : IAsyncDisposable
         {
             Product = "test-product",
             GameVersion = "TEST",
+            GameExecutable = gameExecutable,
             CandidateRoot = "work/candidates",
             ChunkRoot = "work/chunks",
             CatalogRoot = "catalog",
@@ -66,24 +67,50 @@ internal sealed class TestProject : IAsyncDisposable
         string? baseReleaseId = null)
     {
         string candidate = Context.CandidatePath(releaseId);
-        Directory.CreateDirectory(candidate);
+        string payload = Path.Combine(candidate, "files");
+        Directory.CreateDirectory(payload);
         foreach ((string name, byte[] data) in files)
         {
-            await File.WriteAllBytesAsync(Path.Combine(candidate, name), data);
+            await File.WriteAllBytesAsync(Path.Combine(payload, name), data);
         }
+        if (baseReleaseId is null && !files.ContainsKey("Game.exe"))
+            await File.WriteAllBytesAsync(Path.Combine(payload, "Game.exe"), []);
+        List<ReleaseChange> declared = changes?.ToList() ?? files.Keys.Select(path => new ReleaseChange { Path = path }).ToList();
+        if (baseReleaseId is null && declared.All(change => change.Path != "Game.exe"))
+            declared.Add(new ReleaseChange { Path = "Game.exe" });
         ReleaseInfo info = new()
         {
+            SchemaVersion = 2,
+            FullClientFiles = files.Keys.Append("Game.exe").Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            LauncherTicketProtocol = 2,
+            MinimumLauncherVersion = "1.1.1",
             ReleaseId = releaseId,
             ContentVersion = contentVersion,
             GameVersion = "TEST",
             CreatedAt = DateTimeOffset.Parse("2026-09-23T00:00:00Z"),
             BaseReleaseId = baseReleaseId,
-            Changes = changes?.ToList() ?? []
+            Changes = declared
         };
         await File.WriteAllBytesAsync(
             Path.Combine(candidate, "release-info.json"),
             JsonSerializer.SerializeToUtf8Bytes(info, PatchJsonContext.Default.ReleaseInfo));
         return candidate;
+    }
+
+    public async Task MarkAsLegacyProtocolAsync(string releaseId, bool nxOnly = false)
+    {
+        var json = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllBytesAsync(Context.ManifestPath(releaseId)))!.AsObject();
+        json.Remove("launcherTicketProtocol");
+        if (nxOnly)
+        {
+            json["schemaVersion"] = 1;
+            var files = json["files"]!.AsArray();
+            var executable = files.FirstOrDefault(file => file!["path"]!.GetValue<string>() == "Game.exe");
+            if (executable is not null) files.Remove(executable);
+        }
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json.ToJsonString());
+        await File.WriteAllBytesAsync(Context.ManifestPath(releaseId), bytes);
+        await File.WriteAllTextAsync(Context.ManifestSignaturePath(releaseId), Signer.Sign(bytes));
     }
 
     public ValueTask DisposeAsync()

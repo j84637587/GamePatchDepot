@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "product": "NovaStory",
   "gameVersion": "GMS176",
+  "gameExecutable": "NovaStory.exe",
   "candidateRoot": "work/candidates",
   "chunkRoot": "work/chunks",
   "catalogRoot": "catalog",

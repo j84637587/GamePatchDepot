@@ -266,6 +266,11 @@ public sealed class RemoteReleaseService(
             }
             return current;
         }
+        if (manifest.LauncherTicketProtocol != 2)
+            throw new PatchPublisherException("舊票證協定已移除，此版本不可發布頻道；請先建立支援新交接的版本。");
+        if (manifest.SchemaVersion != 2 || !manifest.Files.Any(file => string.Equals(file.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase)))
+            throw new PatchPublisherException("發布版本必須是包含遊戲主程式的完整客戶端版本。");
+        LauncherTicketPolicy.ValidateMinimumVersion(manifest.MinimumLauncherVersion);
         if (current is not null && manifest.ContentVersion <= current.ContentVersion)
         {
             throw new PatchPublisherException(

@@ -15,10 +15,13 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
         string? baseReleaseId = null,
         bool fullClient = false,
         PrepareSelection? selection = null,
-        int? launcherTicketProtocol = null)
+        int? launcherTicketProtocol = null,
+        string? minimumLauncherVersion = null)
     {
-        if (launcherTicketProtocol is not null and not (1 or 2))
-            throw new PatchPublisherException("launcherTicketProtocol 僅支援 1 或 2。");
+        if (launcherTicketProtocol is not null and not 2)
+            throw new PatchPublisherException("舊票證協定已移除，僅支援 launcherTicketProtocol 2。");
+        if (!fullClient)
+            throw new PatchPublisherException("新發布必須使用完整客戶端（--full-client）；舊 NX 清單只供歷史查驗。");
         context.EnsureDirectories();
         if (contentVersion <= 0)
         {
@@ -57,6 +60,8 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
             if (!string.IsNullOrWhiteSpace(baseReleaseId))
             {
                 (baseManifest, _, _) = await catalog.LoadVerifiedAsync(baseReleaseId, cancellationToken);
+                if (baseManifest.SchemaVersion != 2 || !baseManifest.Files.Any(file => string.Equals(file.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase)))
+                    throw new PatchPublisherException("舊基準未記錄遊戲主程式，無法驗證遷移；請使用新版 EXE 建立新完整基準（不加 --base）。");
                 if (contentVersion <= baseManifest.ContentVersion)
                 {
                     throw new PatchPublisherException(
@@ -67,6 +72,11 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
 
             if (!fullClient && baseManifest?.SchemaVersion == 2)
                 throw new PatchPublisherException("完整客戶端版本必須使用 --full-client 準備後續更新。");
+            if (!fullClient && baseManifest?.LauncherTicketProtocol != 2)
+                throw new PatchPublisherException("首次發布或從舊票證協定遷移必須使用 --full-client，包含支援新交接的遊戲 EXE；不能只更新 NX。");
+            string? selectedMinimum = minimumLauncherVersion ??
+                (baseManifest?.LauncherTicketProtocol == 2 ? baseManifest.MinimumLauncherVersion : null);
+            LauncherTicketPolicy.ValidateAgainstBase(selectedMinimum, baseManifest?.MinimumLauncherVersion);
 
             ClientFilePolicy policy = fullClient ? ClientFilePolicy.Load(context.ProjectRoot) : new();
             List<string> sourceFiles = fullClient ? ClientFilePolicy.EnumerateFiles(sourceRoot) : context.AllowedFiles.ToList();
@@ -83,7 +93,13 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 if (selection is null && !installFiles.Contains(replacement, StringComparer.OrdinalIgnoreCase))
                     throw new PatchPublisherException($"替換目標必須存在於來源且未被排除：{replacement}");
             }
-            if (fullClient) policy.ValidateRequired(installFiles);
+            if (fullClient)
+            {
+                policy.ValidateRequired(installFiles);
+                PathPolicy.ValidateInstallPath(context.GameExecutable);
+                if (!installFiles.Contains(context.GameExecutable, StringComparer.OrdinalIgnoreCase))
+                    throw new PatchPublisherException($"完整客戶端缺少遊戲主程式：{context.GameExecutable}");
+            }
             List<string> deleted = fullClient
                 ? baseFiles.Keys.Except(installFiles, StringComparer.OrdinalIgnoreCase).Where(path => !policy.IsExcluded(path)).ToList()
                 : [];
@@ -136,9 +152,12 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 });
             }
 
-            int selectedProtocol = launcherTicketProtocol ?? baseManifest?.LauncherTicketProtocol ?? 1;
+            const int selectedProtocol = 2;
             bool protocolChanged = baseManifest is not null && selectedProtocol != baseManifest.LauncherTicketProtocol;
-            if (baseManifest is not null && !protocolChanged && changes.Count == 0 && deleted.Count == 0 &&
+            if (protocolChanged && !changes.Any(change => string.Equals(change.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase)))
+                throw new PatchPublisherException("舊票證協定遷移必須交付已更新的遊戲 EXE，不能只修改協定欄位。");
+            bool minimumChanged = baseManifest is not null && selectedMinimum != baseManifest.MinimumLauncherVersion;
+            if (baseManifest is not null && !protocolChanged && !minimumChanged && changes.Count == 0 && deleted.Count == 0 &&
                 (!fullClient || baseManifest.SchemaVersion == 2 && baseFiles.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(installFiles) &&
                     (baseManifest.Preserve ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(preserved!)))
             {
@@ -154,7 +173,7 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 ReleaseId = releaseId,
                 ContentVersion = contentVersion,
                 GameVersion = context.Config.GameVersion,
-                MinimumLauncherVersion = baseManifest?.MinimumLauncherVersion ?? "1.0.0",
+                MinimumLauncherVersion = selectedMinimum!,
                 LauncherTicketProtocol = selectedProtocol,
                 SourceDirectory = sourceRoot,
                 CreatedAt = DateTimeOffset.UtcNow,
@@ -256,6 +275,11 @@ public sealed class RollbackBuilder(ProjectContext context, SigningService signe
         }
 
         (ReleaseManifest target, _, _) = await catalog.LoadVerifiedAsync(targetReleaseId, cancellationToken);
+        if (target.LauncherTicketProtocol != 2)
+            throw new PatchPublisherException("此回滾目標使用已移除的舊票證協定，請選擇支援新交接的版本。");
+        if (target.SchemaVersion != 2 || !target.Files.Any(file => string.Equals(file.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase)))
+            throw new PatchPublisherException("回滾目標必須是包含遊戲主程式的完整客戶端版本。");
+        LauncherTicketPolicy.ValidateMinimumVersion(target.MinimumLauncherVersion);
         if (newContentVersion <= target.ContentVersion)
         {
             throw new PatchPublisherException("回滾版本的 contentVersion 仍必須高於目標內容版本。");

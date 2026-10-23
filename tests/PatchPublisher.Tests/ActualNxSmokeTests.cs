@@ -15,15 +15,20 @@ public sealed class ActualNxSmokeTests
         Assert.True(File.Exists(source), $"找不到實際測試檔：{source}");
         await using TestProject project = await TestProject.CreateAsync(["UI.nx"], 256);
         string candidate = project.Context.CandidatePath("2026.09.23.1");
-        Directory.CreateDirectory(candidate);
-        File.Copy(source, Path.Combine(candidate, "UI.nx"));
+        Directory.CreateDirectory(Path.Combine(candidate, "files"));
+        await File.WriteAllBytesAsync(Path.Combine(candidate, "files", "Game.exe"), []);
+        File.Copy(source, Path.Combine(candidate, "files", "UI.nx"));
         ReleaseInfo info = new()
         {
+            SchemaVersion = 2,
+            FullClientFiles = ["Game.exe", "UI.nx"],
+            LauncherTicketProtocol = 2,
+            MinimumLauncherVersion = "1.1.1",
             ReleaseId = "2026.09.23.1",
             ContentVersion = 1008,
             GameVersion = "TEST",
             CreatedAt = DateTimeOffset.Parse("2026-09-23T00:00:00Z"),
-            Changes = [new ReleaseChange { Path = "UI.nx", SourceRevision = "UI40" }]
+            Changes = [new ReleaseChange { Path = "UI.nx", SourceRevision = "UI40" }, new ReleaseChange { Path = "Game.exe" }]
         };
         await File.WriteAllBytesAsync(
             Path.Combine(candidate, "release-info.json"),
@@ -31,7 +36,7 @@ public sealed class ActualNxSmokeTests
 
         ReleaseBuilder builder = new(project.Context, project.Signer);
         (ReleaseManifest manifest, _) = await builder.BuildAsync("2026.09.23.1");
-        ManifestFile file = Assert.Single(manifest.Files);
+        ManifestFile file = Assert.Single(manifest.Files, file => file.Path == "UI.nx");
         Assert.Equal(607_577_868, file.Size);
         Assert.Equal("fb20f1f4ead436401dc78a2254399573629a74d150cb64bc3c0076568eb000d4", file.Sha256);
         Assert.Equal(3, file.Chunks.Count);

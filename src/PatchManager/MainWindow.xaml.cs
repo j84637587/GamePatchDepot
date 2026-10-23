@@ -142,6 +142,7 @@ public partial class MainWindow : Window
         ReleaseIdTextBox.Text = SuggestReleaseId();
         ContentVersionTextBox.Text = (_highestContentVersion + 1).ToString(CultureInfo.InvariantCulture);
         DescriptionTextBox.Clear();
+        NewFullClientBaselineCheckBox.IsChecked = false;
         UiReplacementTextBox.Clear();
         _updatingFields = false;
         _deepVerifiedReleaseId = null;
@@ -209,6 +210,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        string minimumLauncherVersion = MinimumLauncherVersionTextBox.Text.Trim();
+        bool newFullClientBaseline = NewFullClientBaselineCheckBox.IsChecked == true;
         List<string> arguments =
         [
             "prepare", "--full-client", "--release", releaseId,
@@ -216,12 +219,17 @@ public partial class MainWindow : Window
             "--source", SourceTextBox.Text.Trim(),
             "--description", DescriptionTextBox.Text.Trim()
         ];
+        if (minimumLauncherVersion.Length > 0)
+        {
+            arguments.Add("--minimum-launcher-version");
+            arguments.Add(minimumLauncherVersion);
+        }
         if (!string.IsNullOrWhiteSpace(UiReplacementTextBox.Text))
         {
             arguments.Add("--replace");
             arguments.Add($"UI.nx={UiReplacementTextBox.Text.Trim()}");
         }
-        string? baseReleaseId = GetPublishedBaseReleaseId();
+        string? baseReleaseId = newFullClientBaseline ? null : GetPublishedBaseReleaseId();
         if (baseReleaseId is not null)
         {
             string baseManifest = Path.Combine(_projectRoot, "catalog", "releases", $"{baseReleaseId}.json");
@@ -250,7 +258,8 @@ public partial class MainWindow : Window
             // 掃描期間若使用者改了欄位，不可拿舊清單建立不同來源的版本。
             if (SourceTextBox.Text.Trim() != source || UiReplacementTextBox.Text.Trim() != replacement ||
                 ReleaseIdTextBox.Text.Trim() != releaseId || ContentVersionTextBox.Text.Trim() != contentVersion ||
-                DescriptionTextBox.Text.Trim() != description)
+                DescriptionTextBox.Text.Trim() != description || MinimumLauncherVersionTextBox.Text.Trim() != minimumLauncherVersion ||
+                (NewFullClientBaselineCheckBox.IsChecked == true) != newFullClientBaseline)
             {
                 AppDialog.Warning(this, "欄位已變更", "掃描期間欄位有變更，請重新按 Prepare 確認清單。");
                 return;
@@ -891,7 +900,7 @@ public partial class MainWindow : Window
                 bool fullClient = metadata.RootElement.TryGetProperty("schemaVersion", out JsonElement schema) && schema.GetInt32() == 2;
                 ReleaseScopeText.Text = fullClient
                     ? "目前版本：完整客戶端。Candidate 只保存變更檔案，Manifest 記錄完整內容。"
-                    : "目前版本：舊版 NX。仍可繼續原流程；新建版本將使用完整客戶端模式。";
+                    : "目前版本：舊版 NX，僅供歷史查驗；請使用新版遊戲建立新完整基準。";
             }
             catch (JsonException) { ReleaseScopeText.Text = "版本資料無法讀取，請檢查 Candidate／Manifest。"; }
         }
@@ -1136,6 +1145,23 @@ public partial class MainWindow : Window
             return releases;
         }
 
+        string gameExecutable;
+        try
+        {
+            using JsonDocument config = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(_projectRoot, "config", "product.json")));
+            if (config.RootElement.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException("product.json 必須是 JSON 物件。");
+            gameExecutable = config.RootElement.TryGetProperty("gameExecutable", out JsonElement executable)
+                ? executable.ValueKind == JsonValueKind.String ? executable.GetString()! : throw new InvalidDataException("gameExecutable 必須是字串。")
+                : "NovaStory.exe";
+            gameExecutable = gameExecutable.Replace('\\', '/').Trim();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
+        {
+            AppendLog($"無法讀取遊戲主程式設定，暫不提供退版目標：{exception.Message}", true);
+            return releases;
+        }
+
         foreach (string path in Directory.EnumerateFiles(releaseDirectory, "*.json"))
         {
             string releaseId = Path.GetFileNameWithoutExtension(path);
@@ -1150,11 +1176,31 @@ public partial class MainWindow : Window
             try
             {
                 using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(path));
+                if (!document.RootElement.TryGetProperty("files", out JsonElement files) || files.ValueKind != JsonValueKind.Array ||
+                    !files.EnumerateArray().Any(file => file.ValueKind == JsonValueKind.Object &&
+                        file.TryGetProperty("path", out JsonElement entryPath) && entryPath.ValueKind == JsonValueKind.String &&
+                        string.Equals(entryPath.GetString(), gameExecutable, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+                if (!document.RootElement.TryGetProperty("launcherTicketProtocol", out JsonElement protocol) ||
+                    protocol.ValueKind != JsonValueKind.Number || !protocol.TryGetInt32(out int protocolVersion) || protocolVersion != 2)
+                {
+                    continue;
+                }
+                if (!document.RootElement.TryGetProperty("minimumLauncherVersion", out JsonElement minimum) ||
+                    minimum.ValueKind != JsonValueKind.String || minimum.GetString() is not string minimumText ||
+                    minimumText.Split('.').Length != 3 || !Version.TryParse(minimumText, out Version? minimumVersion) ||
+                    minimumVersion.ToString() != minimumText || minimumVersion <= new Version(1, 1, 0))
+                {
+                    continue;
+                }
                 long contentVersion = document.RootElement.GetProperty("contentVersion").GetInt64();
                 if (contentVersion < newContentVersion)
                 {
                     int schemaVersion = document.RootElement.GetProperty("schemaVersion").GetInt32();
-                    releases.Add(new RollbackReleaseOption(releaseId, contentVersion, schemaVersion == 2));
+                    if (schemaVersion == 2)
+                        releases.Add(new RollbackReleaseOption(releaseId, contentVersion, true));
                 }
             }
             catch (JsonException)

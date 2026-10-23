@@ -14,6 +14,54 @@ public sealed partial class RemoteVerificationTests
     private const string ReleaseId = "2026.09.26.1";
 
     [Fact]
+    public async Task CurrentLegacyChannelCanRepairHistoryWithoutSwitchingOrReenablingIt()
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
+        FakeS3Client client = await SeedAsync(project);
+        await project.MarkAsLegacyProtocolAsync(ReleaseId, nxOnly: true);
+        byte[] manifest = await File.ReadAllBytesAsync(project.Context.ManifestPath(ReleaseId));
+        client.Objects[ObjectKeys.ForManifest(ReleaseId)] = manifest;
+        client.Objects[ObjectKeys.ForManifestSignature(ReleaseId)] = await File.ReadAllBytesAsync(project.Context.ManifestSignaturePath(ReleaseId));
+        ChannelPayload current = new()
+        {
+            Channel = "test", Generation = 1, ReleaseId = ReleaseId, ContentVersion = 1,
+            ManifestKey = ObjectKeys.ForManifest(ReleaseId), ManifestSha256 = FileUtilities.Sha256Hex(manifest),
+            PublishedAt = DateTimeOffset.UtcNow
+        };
+        byte[] envelope = SignedEnvelopeService.Create(current, PatchJsonContext.Default.ChannelPayload, project.Signer);
+        client.Objects[ObjectKeys.ForChannel("test")] = envelope;
+        await using R2ObjectStore store = new(client, "test-bucket");
+        RemoteReleaseService service = Service(project, store);
+        var repaired = await service.PromoteAsync(ReleaseId, "test");
+        Assert.Equal(1, repaired.Generation);
+        Assert.Equal(envelope, client.Objects[ObjectKeys.ForChannel("test")]);
+        Assert.Equal(envelope, client.Objects[ObjectKeys.ForChannelHistory("test", 1)]);
+        await service.PromoteAsync(ReleaseId, "test");
+        var error = await Assert.ThrowsAsync<PatchPublisherException>(() => service.PromoteAsync(ReleaseId, "stable"));
+        Assert.Contains("舊票證協定", error.Message);
+        Assert.False(client.Objects.ContainsKey(ObjectKeys.ForChannel("stable")));
+    }
+
+    [Fact]
+    public async Task LegacyHistoryCanBeVerifiedButCannotBePromotedOrRolledBack()
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
+        FakeS3Client client = await SeedAsync(project);
+        await project.MarkAsLegacyProtocolAsync(ReleaseId);
+        client.Objects[ObjectKeys.ForManifest(ReleaseId)] = await File.ReadAllBytesAsync(project.Context.ManifestPath(ReleaseId));
+        client.Objects[ObjectKeys.ForManifestSignature(ReleaseId)] = await File.ReadAllBytesAsync(project.Context.ManifestSignaturePath(ReleaseId));
+        await using R2ObjectStore store = new(client, "test-bucket");
+        RemoteReleaseService service = Service(project, store);
+        var (legacy, _) = await service.VerifyRemoteAsync(ReleaseId, false);
+        Assert.Equal(1, legacy.LauncherTicketProtocol);
+        var error = await Assert.ThrowsAsync<PatchPublisherException>(() => service.PromoteAsync(ReleaseId, "test"));
+        Assert.Contains("舊票證協定", error.Message);
+        Assert.False(client.Objects.ContainsKey(ObjectKeys.ForChannel("test")));
+        var rollback = new RollbackBuilder(project.Context, project.Signer, new ReleaseCatalog(project.Context, project.Signer));
+        await Assert.ThrowsAsync<PatchPublisherException>(() => rollback.BuildAsync("2026.09.26.2", 2, ReleaseId));
+    }
+
+    [Fact]
     public async Task UploadIncludesAdditionalPatchAndRemoteDeepVerificationChecksIt()
     {
         await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
@@ -66,7 +114,7 @@ public sealed partial class RemoteVerificationTests
         // 這裡只測試傳輸／GC；真實補丁格式與套用由 DeltaPatchTests 驗證。
         string hash = FileUtilities.Sha256Hex([8]);
         FileDeltaPatch patch = new() { BaseSha256 = new string('a', 64), BaseSize = 3, Sha256 = hash, Size = 1, Key = ObjectKeys.ForPatch(hash) };
-        RewriteManifest(project, client, manifest => manifest["files"]![0]!["patch"] = JsonSerializer.SerializeToNode(
+        RewriteManifest(project, client, manifest => manifest["files"]!.AsArray().Single(file => file!["path"]!.GetValue<string>() == "UI.nx")!["patch"] = JsonSerializer.SerializeToNode(
             patch, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
         await File.WriteAllBytesAsync(project.Context.ManifestPath(ReleaseId), client.Objects[ObjectKeys.ForManifest(ReleaseId)]);
         await File.WriteAllBytesAsync(project.Context.ManifestSignaturePath(ReleaseId), client.Objects[ObjectKeys.ForManifestSignature(ReleaseId)]);
@@ -184,7 +232,7 @@ public sealed partial class RemoteVerificationTests
     {
         await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
         FakeS3Client client = await SeedAsync(project);
-        RewriteManifest(project, client, manifest => manifest["files"]![0]!["sha256"] = new string('a', 64));
+        RewriteManifest(project, client, manifest => manifest["files"]!.AsArray().Single(file => file!["path"]!.GetValue<string>() == "UI.nx")!["sha256"] = new string('a', 64));
         await File.WriteAllBytesAsync(project.Context.ManifestPath(ReleaseId), client.Objects[ObjectKeys.ForManifest(ReleaseId)]);
         await File.WriteAllBytesAsync(project.Context.ManifestSignaturePath(ReleaseId), client.Objects[ObjectKeys.ForManifestSignature(ReleaseId)]);
         await using R2ObjectStore store = new(client, "test-bucket");

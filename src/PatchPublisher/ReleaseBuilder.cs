@@ -20,6 +20,8 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
         }
 
         ReleaseInfo releaseInfo = await LoadAndValidateReleaseInfoAsync(candidatePath, releaseId, cancellationToken);
+        if (releaseInfo.SchemaVersion == 1 && string.IsNullOrWhiteSpace(releaseInfo.BaseReleaseId))
+            throw new PatchPublisherException("首次發布必須使用完整客戶端，不能只更新 NX。");
         bool fullClient = releaseInfo.SchemaVersion == 2;
         string payloadRoot = fullClient ? Path.Combine(candidatePath, "files") : candidatePath;
         ReleaseCatalog versionCatalog = new(context, signer);
@@ -35,6 +37,7 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
         int chunkSize = checked(context.Config.ChunkSizeMiB * 1024 * 1024);
         Dictionary<string, ManifestFile> manifestFiles = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, ManifestFile> baseFiles = new(StringComparer.OrdinalIgnoreCase);
+        bool migratingLegacyProtocol = false;
         ReleaseManifest? existingManifest = File.Exists(context.ManifestPath(releaseId))
             ? (await versionCatalog.LoadVerifiedAsync(releaseId, cancellationToken)).Manifest : null;
         int newLocalChunkCount = 0;
@@ -45,6 +48,12 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
             (ReleaseManifest baseManifest, _, _) = await versionCatalog.LoadVerifiedAsync(
                 releaseInfo.BaseReleaseId,
                 cancellationToken);
+            LauncherTicketPolicy.ValidateAgainstBase(releaseInfo.MinimumLauncherVersion, baseManifest.MinimumLauncherVersion);
+            if (baseManifest.SchemaVersion != 2 || !baseManifest.Files.Any(file => string.Equals(file.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase)))
+                throw new PatchPublisherException("舊基準未記錄遊戲主程式，無法驗證遷移；請使用新版 EXE 建立新完整基準（不加 --base）。");
+            migratingLegacyProtocol = baseManifest.LauncherTicketProtocol != 2;
+            if (migratingLegacyProtocol && !fullClient)
+                throw new PatchPublisherException("舊票證協定遷移必須使用完整客戶端，不能只更新 NX。");
             foreach (ManifestFile file in baseManifest.Files)
             {
                 baseFiles[file.Path] = file;
@@ -121,6 +130,10 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
         List<ManifestFile> orderedManifestFiles = manifestFiles.Values
             .OrderBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        if (migratingLegacyProtocol && !orderedManifestFiles.Any(file =>
+            string.Equals(file.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase) &&
+            baseFiles.TryGetValue(file.Path, out ManifestFile? old) && file.Sha256 != old.Sha256))
+            throw new PatchPublisherException("舊票證協定遷移必須交付已更新的遊戲 EXE，不能只修改協定欄位。");
         List<string> deletePaths = releaseInfo.Delete
             .Select(PathPolicy.NormalizeInstallPath)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -316,6 +329,9 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
             PathPolicy.ValidateFileSet(releaseInfo.FullClientFiles);
             ClientFilePolicy policy = ClientFilePolicy.Load(context.ProjectRoot);
             policy.ValidateRequired(releaseInfo.FullClientFiles);
+            PathPolicy.ValidateInstallPath(context.GameExecutable);
+            if (!releaseInfo.FullClientFiles.Contains(context.GameExecutable, StringComparer.OrdinalIgnoreCase))
+                throw new PatchPublisherException($"完整客戶端缺少遊戲主程式：{context.GameExecutable}");
             List<string> all = ClientFilePolicy.EnumerateFiles(candidatePath);
             if (all.Any(path => path != "release-info.json" && !path.StartsWith("files/", StringComparison.Ordinal)))
                 throw new PatchPublisherException("完整客戶端 Candidate 內容必須位於 files 子目錄。");
@@ -410,10 +426,11 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
             PatchJsonContext.Default.ReleaseInfo,
             cancellationToken) ?? throw new PatchPublisherException("release-info.json 格式錯誤。");
 
-        if (releaseInfo.LauncherTicketProtocol is not (1 or 2))
-            throw new PatchPublisherException("不支援的 launcherTicketProtocol（僅支援 1 或 2）。");
-        if (releaseInfo.SchemaVersion is not (1 or 2))
-            throw new PatchPublisherException("不支援的 Candidate Schema。");
+        if (releaseInfo.LauncherTicketProtocol != 2)
+            throw new PatchPublisherException("舊票證協定已移除，請使用支援新交接的 NovaStory 重新 Prepare（launcherTicketProtocol 必須是 2）。");
+        LauncherTicketPolicy.ValidateMinimumVersion(releaseInfo.MinimumLauncherVersion);
+        if (releaseInfo.SchemaVersion != 2)
+            throw new PatchPublisherException("新發布必須使用完整客戶端 Candidate，不能只更新 NX。");
 
         if (!string.Equals(releaseInfo.ReleaseId, expectedReleaseId, StringComparison.Ordinal))
         {

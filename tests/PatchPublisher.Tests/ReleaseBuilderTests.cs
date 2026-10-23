@@ -16,7 +16,7 @@ public sealed class ReleaseBuilderTests
         info["launcherTicketProtocol"] = protocol;
         await File.WriteAllTextAsync(infoPath, info.ToJsonString());
         ReleaseBuilder builder = new(project.Context, project.Signer);
-        if (protocol == 3)
+        if (protocol != 2)
         {
             await Assert.ThrowsAsync<PatchPublisherException>(() => builder.BuildAsync("2026.09.23.1"));
             return;
@@ -26,9 +26,8 @@ public sealed class ReleaseBuilderTests
         var verified = await new ReleaseCatalog(project.Context, project.Signer).LoadVerifiedAsync("2026.09.23.1");
         Assert.Equal(protocol, verified.Manifest.LauncherTicketProtocol);
         var signedJson = System.Text.Json.Nodes.JsonNode.Parse(verified.Bytes)!;
-        if (protocol == 1) Assert.Null(signedJson["launcherTicketProtocol"]);
-        else Assert.Equal(2, signedJson["launcherTicketProtocol"]!.GetValue<int>());
-        // Rebuilding an immutable legacy manifest cannot add a default field.
+        Assert.Equal(2, signedJson["launcherTicketProtocol"]!.GetValue<int>());
+        // Rebuilding a supported immutable manifest remains byte-compatible.
         await builder.BuildAsync("2026.09.23.1");
         var rebuilt = await new ReleaseCatalog(project.Context, project.Signer).LoadVerifiedAsync("2026.09.23.1");
         Assert.Equal(verified.Bytes, rebuilt.Bytes);
@@ -48,7 +47,7 @@ public sealed class ReleaseBuilderTests
         ReleaseBuilder builder = new(project.Context, project.Signer);
         (ReleaseManifest manifest, BuildReport firstReport) = await builder.BuildAsync("2026.09.23.1");
 
-        ManifestFile file = Assert.Single(manifest.Files);
+        ManifestFile file = Assert.Single(manifest.Files, file => file.Path == "UI.nx");
         Assert.Equal(3, file.Chunks.Count);
         Assert.Equal(1024 * 1024, file.Chunks[0].Size);
         Assert.Equal(1024 * 1024, file.Chunks[1].Size);
@@ -78,7 +77,7 @@ public sealed class ReleaseBuilderTests
         ReleaseBuilder builder = new(project.Context, project.Signer);
         PatchPublisherException exception = await Assert.ThrowsAsync<PatchPublisherException>(
             () => builder.BuildAsync("2026.09.23.1"));
-        Assert.Contains("不允許", exception.Message);
+        Assert.Contains("files 子目錄", exception.Message);
     }
 
     [Fact]
@@ -91,7 +90,7 @@ public sealed class ReleaseBuilderTests
             new Dictionary<string, byte[]> { ["UI.nx"] = TestProject.DeterministicBytes(2000, 1) });
         ReleaseBuilder builder = new(project.Context, project.Signer);
         (ReleaseManifest manifest, _) = await builder.BuildAsync("2026.09.23.1");
-        ManifestChunk chunk = Assert.Single(Assert.Single(manifest.Files).Chunks);
+        ManifestChunk chunk = Assert.Single(Assert.Single(manifest.Files, file => file.Path == "UI.nx").Chunks);
         string chunkPath = ObjectKeys.LocalChunkPath(project.Context.ChunkRoot, chunk.Sha256);
         await File.WriteAllBytesAsync(chunkPath, TestProject.DeterministicBytes(chunk.Size, 9));
 

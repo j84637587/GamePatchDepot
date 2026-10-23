@@ -172,14 +172,13 @@ public static class Program
             options.Get("launcher-ticket-protocol") switch
             {
                 null => null,
-                "1" => 1,
                 "2" => 2,
-                _ => throw new PatchPublisherException("--launcher-ticket-protocol 僅支援 1 或 2。")
-            });
+                _ => throw new PatchPublisherException("舊票證協定已移除，--launcher-ticket-protocol 僅支援 2。")
+            }, options.Get("minimum-launcher-version"));
         Console.WriteLine($"Candidate 已建立：{path}");
         ReleaseInfo info = System.Text.Json.JsonSerializer.Deserialize(await File.ReadAllBytesAsync(Path.Combine(path, "release-info.json"), cancellationToken),
             PatchJsonContext.Default.ReleaseInfo)!;
-        Console.WriteLine($"模式：{(info.SchemaVersion == 2 ? "完整客戶端" : "舊版 NX")}");
+        Console.WriteLine("範圍：完整客戶端");
         Console.WriteLine($"Candidate 僅保存 {info.Changes.Count} 個變更檔案。");
         if (info.FullClientFiles is not null)
             Console.WriteLine($"完整版本收錄 {info.FullClientFiles.Count} 個檔案，移除 {info.Delete.Count} 個，排除 {info.ExcludedFiles.Count} 個。");
@@ -489,9 +488,10 @@ Game Patch Depot - PatchPublisher
   launcher-status
   keygen --private <path> [--public <path>]
   preview --source <dir> --output <selection.json> [--base <release-id>] [--replace UI.nx=<path>]
-  prepare --release <id> --content-version <n> --source <dir>
-          [--full-client] [--selection <selection.json>] [--base <release-id>] [--replace UI.nx=<path>] [--description <text>]
-          [--launcher-ticket-protocol <1|2>]
+  prepare --full-client --release <id> --content-version <n> --source <dir>
+          [--minimum-launcher-version <x.y.z>] (required for first publication / legacy migration)
+          [--selection <selection.json>] [--base <release-id>] [--replace UI.nx=<path>] [--description <text>]
+          [--launcher-ticket-protocol 2]
   build --release <id>
   rollback --release <new-id> --content-version <n> --to <old-id>
   discard-candidate --release <id>

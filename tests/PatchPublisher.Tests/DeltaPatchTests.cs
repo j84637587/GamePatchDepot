@@ -13,16 +13,16 @@ public sealed class DeltaPatchTests
         await project.CreateCandidateAsync("2026.09.27.1", 1, new Dictionary<string, byte[]> { ["UI.nx"] = old });
         ReleaseBuilder builder = new(project.Context, project.Signer);
         (ReleaseManifest first, _) = await builder.BuildAsync("2026.09.27.1");
-        Assert.Null(first.Files[0].Patch);
+        Assert.Null(first.Files.Single(file => file.Path == "UI.nx").Patch);
         byte[] next = [.. Encoding.UTF8.GetBytes("insert at front to shift all chunk boundaries"), .. old];
         next[2 * 1024 * 1024] ^= 1;
         await project.CreateCandidateAsync("2026.09.27.2", 2, new Dictionary<string, byte[]> { ["UI.nx"] = next },
             [new ReleaseChange { Path = "UI.nx" }], baseReleaseId: first.ReleaseId);
         (ReleaseManifest second, _) = await builder.BuildAsync("2026.09.27.2");
-        ManifestFile target = Assert.Single(second.Files);
+        ManifestFile target = Assert.Single(second.Files, file => file.Path == "UI.nx");
         FileDeltaPatch patch = Assert.IsType<FileDeltaPatch>(target.Patch);
         Assert.True(patch.Size < next.Length / 10, $"patch={patch.Size}; full={next.Length}");
-        Assert.Equal(first.Files[0].Sha256, patch.BaseSha256);
+        Assert.Equal(first.Files.Single(file => file.Path == "UI.nx").Sha256, patch.BaseSha256);
         Assert.Equal((long)old.Length, patch.BaseSize);
         Assert.NotEmpty(target.Chunks);
         Assert.Equal(next.LongLength, target.Chunks.Sum(chunk => (long)chunk.Size));
@@ -33,7 +33,7 @@ public sealed class DeltaPatchTests
         Assert.Equal(manifestBefore, await File.ReadAllBytesAsync(project.Context.ManifestPath(second.ReleaseId)));
         string restored = Path.Combine(project.Root, "restored.nx");
         await new HdiffPatchTool(Path.Combine(project.Root, "tools", "hdiffpatch")).ApplyAsync(
-            Path.Combine(project.Context.CandidatePath(first.ReleaseId), "UI.nx"),
+            Path.Combine(project.Context.CandidatePath(first.ReleaseId), "files", "UI.nx"),
             ObjectKeys.LocalPatchPath(project.Context, patch.Sha256), restored, CancellationToken.None);
         Assert.Equal(next, await File.ReadAllBytesAsync(restored));
         Assert.Empty(Directory.EnumerateDirectories(Path.Combine(project.Root, "work", "staging")));
@@ -57,8 +57,8 @@ public sealed class DeltaPatchTests
         await project.CreateCandidateAsync("2026.09.27.2", 2, new Dictionary<string, byte[]> { ["UI.nx"] = [2] },
             [new ReleaseChange { Path = "UI.nx" }], baseReleaseId: "2026.09.27.1");
         (ReleaseManifest next, _) = await builder.BuildAsync("2026.09.27.2");
-        Assert.Null(next.Files[0].Patch);
-        Assert.NotEmpty(next.Files[0].Chunks);
+        Assert.Null(next.Files.Single(file => file.Path == "UI.nx").Patch);
+        Assert.NotEmpty(next.Files.Single(file => file.Path == "UI.nx").Chunks);
     }
 
     [Fact]
@@ -74,17 +74,17 @@ public sealed class DeltaPatchTests
         ReleaseCatalog catalog = new(project.Context, project.Signer);
         CandidatePreparer preparer = new(project.Context, catalog);
         ReleaseBuilder builder = new(project.Context, project.Signer);
-        await preparer.PrepareAsync("2026.09.27.1", 1, source, new Dictionary<string, string>(), "first", fullClient: true);
+        await preparer.PrepareAsync("2026.09.27.1", 1, source, new Dictionary<string, string>(), "first", fullClient: true, minimumLauncherVersion: "1.1.1");
         await builder.BuildAsync("2026.09.27.1");
         await File.WriteAllBytesAsync(Path.Combine(source, "UI.nx"), [5, .. old]);
         await File.WriteAllBytesAsync(Path.Combine(source, "new.dll"), [4]);
-        await preparer.PrepareAsync("2026.09.27.2", 2, source, new Dictionary<string, string>(), "second", baseReleaseId: "2026.09.27.1", fullClient: true);
+        await preparer.PrepareAsync("2026.09.27.2", 2, source, new Dictionary<string, string>(), "second", baseReleaseId: "2026.09.27.1", fullClient: true, minimumLauncherVersion: "1.1.1");
         (ReleaseManifest second, _) = await builder.BuildAsync("2026.09.27.2");
         Assert.NotNull(second.Files.Single(file => file.Path == "UI.nx").Patch);
         Assert.Null(second.Files.Single(file => file.Path == "Game.exe").Patch);
         Assert.Null(second.Files.Single(file => file.Path == "new.dll").Patch);
         await File.WriteAllBytesAsync(Path.Combine(source, "new.dll"), [9]);
-        await preparer.PrepareAsync("2026.09.27.3", 3, source, new Dictionary<string, string>(), "third", baseReleaseId: "2026.09.27.2", fullClient: true);
+        await preparer.PrepareAsync("2026.09.27.3", 3, source, new Dictionary<string, string>(), "third", baseReleaseId: "2026.09.27.2", fullClient: true, minimumLauncherVersion: "1.1.1");
         (ReleaseManifest third, _) = await builder.BuildAsync("2026.09.27.3");
         Assert.Null(third.Files.Single(file => file.Path == "UI.nx").Patch);
     }
@@ -99,7 +99,7 @@ public sealed class DeltaPatchTests
         await project.CreateCandidateAsync("2026.09.27.1", 1, new Dictionary<string, byte[]> { ["UI.nx"] = [1, 2, 3] });
         ReleaseBuilder builder = new(project.Context, project.Signer);
         (ReleaseManifest first, _) = await builder.BuildAsync("2026.09.27.1");
-        ManifestChunk chunk = first.Files[0].Chunks[0];
+        ManifestChunk chunk = first.Files.Single(file => file.Path == "UI.nx").Chunks[0];
         string baseChunk = ObjectKeys.LocalChunkPath(project.Context.ChunkRoot, chunk.Sha256);
         if (missing) File.Delete(baseChunk);
         else await File.WriteAllBytesAsync(baseChunk, [3, 2, 1]);
@@ -120,9 +120,9 @@ public sealed class DeltaPatchTests
         await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
         await project.CreateCandidateAsync("2026.09.27.1", 1, new Dictionary<string, byte[]> { ["UI.nx"] = [1, 2, 3, 4] });
         (ReleaseManifest manifest, _) = await new ReleaseBuilder(project.Context, project.Signer).BuildAsync("2026.09.27.1");
-        ManifestFile file = manifest.Files[0];
+        ManifestFile file = manifest.Files.Single(file => file.Path == "UI.nx");
         string hash = FileUtilities.Sha256Hex([8]);
-        manifest.Files[0] = new ManifestFile
+        manifest.Files[manifest.Files.FindIndex(item => item.Path == "UI.nx")] = new ManifestFile
         {
             Path = file.Path, Size = file.Size, Sha256 = file.Sha256, Chunks = file.Chunks,
             Patch = new FileDeltaPatch
