@@ -1150,6 +1150,11 @@ public partial class MainWindow : Window
             try
             {
                 using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(path));
+                if (!document.RootElement.TryGetProperty("launcherTicketProtocol", out JsonElement protocol) ||
+                    !protocol.TryGetInt32(out int protocolVersion) || protocolVersion != 2)
+                {
+                    continue;
+                }
                 long contentVersion = document.RootElement.GetProperty("contentVersion").GetInt64();
                 if (contentVersion < newContentVersion)
                 {

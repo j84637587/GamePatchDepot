@@ -67,6 +67,8 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
 
             if (!fullClient && baseManifest?.SchemaVersion == 2)
                 throw new PatchPublisherException("完整客戶端版本必須使用 --full-client 準備後續更新。");
+            if (!fullClient && baseManifest?.LauncherTicketProtocol != 2)
+                throw new PatchPublisherException("首次發布或從舊票證協定遷移必須使用 --full-client，包含支援新交接的遊戲 EXE；不能只更新 NX。");
 
             ClientFilePolicy policy = fullClient ? ClientFilePolicy.Load(context.ProjectRoot) : new();
             List<string> sourceFiles = fullClient ? ClientFilePolicy.EnumerateFiles(sourceRoot) : context.AllowedFiles.ToList();

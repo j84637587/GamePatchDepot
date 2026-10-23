@@ -10,6 +10,7 @@ public sealed class CandidateAndRollbackTests
         Directory.CreateDirectory(source);
         await File.WriteAllBytesAsync(Path.Combine(source, "A.nx"), [1, 2, 3]);
         await File.WriteAllBytesAsync(Path.Combine(source, "UI.nx"), [4, 5, 6]);
+        await File.WriteAllBytesAsync(Path.Combine(source, "Game.exe"), [7, 8]);
         string replacement = Path.Combine(project.Root, "UI40.nx");
         await File.WriteAllBytesAsync(replacement, [9, 9, 9]);
 
@@ -21,11 +22,35 @@ public sealed class CandidateAndRollbackTests
             source,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["UI.nx"] = replacement },
             "更新 UI",
-            CancellationToken.None);
+            CancellationToken.None, fullClient: true);
 
-        Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(Path.Combine(candidate, "A.nx")));
-        Assert.Equal(new byte[] { 9, 9, 9 }, await File.ReadAllBytesAsync(Path.Combine(candidate, "UI.nx")));
+        Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(Path.Combine(candidate, "files", "A.nx")));
+        Assert.Equal(new byte[] { 9, 9, 9 }, await File.ReadAllBytesAsync(Path.Combine(candidate, "files", "UI.nx")));
         Assert.True(File.Exists(Path.Combine(candidate, "release-info.json")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Prepare_NxOnlyCannotIntroduceReadyProtocol(bool legacyBase)
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
+        string source = Path.Combine(project.Root, "source");
+        Directory.CreateDirectory(source);
+        await File.WriteAllBytesAsync(Path.Combine(source, "UI.nx"), [9]);
+        if (legacyBase)
+        {
+            await project.CreateCandidateAsync("2026.09.23.1", 1,
+                new Dictionary<string, byte[]> { ["UI.nx"] = [1] });
+            await new ReleaseBuilder(project.Context, project.Signer).BuildAsync("2026.09.23.1");
+            await project.MarkAsLegacyProtocolAsync("2026.09.23.1");
+        }
+        var error = await Assert.ThrowsAsync<PatchPublisherException>(() =>
+            new CandidatePreparer(project.Context, new ReleaseCatalog(project.Context, project.Signer)).PrepareAsync(
+                "2026.09.23.2", 2, source, new Dictionary<string, string>(), "NX only",
+                baseReleaseId: legacyBase ? "2026.09.23.1" : null));
+        Assert.Contains("--full-client", error.Message);
+        Assert.False(Directory.Exists(project.Context.CandidatePath("2026.09.23.2")));
     }
 
     [Fact]
