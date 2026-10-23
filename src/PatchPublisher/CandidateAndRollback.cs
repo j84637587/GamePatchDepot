@@ -14,8 +14,11 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
         CancellationToken cancellationToken = default,
         string? baseReleaseId = null,
         bool fullClient = false,
-        PrepareSelection? selection = null)
+        PrepareSelection? selection = null,
+        int? launcherTicketProtocol = null)
     {
+        if (launcherTicketProtocol is not null and not (1 or 2))
+            throw new PatchPublisherException("launcherTicketProtocol 僅支援 1 或 2。");
         context.EnsureDirectories();
         if (contentVersion <= 0)
         {
@@ -133,7 +136,9 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 });
             }
 
-            if (baseManifest is not null && changes.Count == 0 && deleted.Count == 0 &&
+            int selectedProtocol = launcherTicketProtocol ?? baseManifest?.LauncherTicketProtocol ?? 1;
+            bool protocolChanged = baseManifest is not null && selectedProtocol != baseManifest.LauncherTicketProtocol;
+            if (baseManifest is not null && !protocolChanged && changes.Count == 0 && deleted.Count == 0 &&
                 (!fullClient || baseManifest.SchemaVersion == 2 && baseFiles.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(installFiles) &&
                     (baseManifest.Preserve ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(preserved!)))
             {
@@ -150,7 +155,7 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 ContentVersion = contentVersion,
                 GameVersion = context.Config.GameVersion,
                 MinimumLauncherVersion = baseManifest?.MinimumLauncherVersion ?? "1.0.0",
-                LauncherTicketProtocol = baseManifest?.LauncherTicketProtocol ?? 1,
+                LauncherTicketProtocol = selectedProtocol,
                 SourceDirectory = sourceRoot,
                 CreatedAt = DateTimeOffset.UtcNow,
                 BaseReleaseId = baseReleaseId,

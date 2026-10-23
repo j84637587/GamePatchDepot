@@ -108,5 +108,6 @@ Upload 後按「R2 深度驗證」。工具會先驗證本機與遠端 Manifest 
 - 先發布包含新流程的 NovaLink，使用新的正式版本號；再準備支援 `--novalink-ticket-ready-stdin` 的新版 NovaStory。
 - Prepare 完成、Build 之前，在 Candidate 的 `release-info.json` 同時設定 `"launcherTicketProtocol": 2`，以及 `minimumLauncherVersion`：填入剛發布、支援新流程的 NovaLink 實際版本號。不要保留預設 `1.0.0` 或沿用不支援此流程的舊版號。然後照原流程 Build、驗證及發布 Test。
 - 測試確認後再發布 Stable。舊遊戲請維持 `1` 或不填；請勿直接修改已簽章的 Manifest。回滾會沿用目標版本的協定。
+- 若遊戲檔案完全沒變、只需啟用或停用新協定，使用 CLI 的 `prepare`，保留正常的新版 Release ID／contentVersion／source／base，另加 `--launcher-ticket-protocol 2` 或 `1`。這會建立只調整協定的 Candidate；啟用 `2` 時，Build 前仍須依上一點設定最低 NovaLink 版本。檔案與協定都沒有變更時仍會拒絕。
 
 協定欄位會納入 Manifest 簽章；它是發布者對遊戲能力的聲明，工具無法代替實際遊戲驗證。第一次未設定時使用舊交接方式，以相容已發布版本；後續 Candidate 自動沿用基準版本的協定與最低 NovaLink 版本，不必每次重填。若要降回舊模式，需在 Build 前明確設為 `1`。舊模式不新增 Manifest 欄位，以保留既有不可變清單的相容性。

@@ -7,6 +7,37 @@ public sealed class PrepareSelectionTests
     private static readonly Dictionary<string, string> NoReplacements = new();
 
     [Theory]
+    [InlineData(1, 2)]
+    [InlineData(2, 1)]
+    public async Task CliCanPrepareProtocolOnlyReleaseWithoutChangingFiles(int previous, int desired)
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
+        string source = await CreateSourceAsync(project);
+        ReleaseCatalog catalog = new(project.Context, project.Signer);
+        CandidatePreparer preparer = new(project.Context, catalog);
+        await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true,
+            launcherTicketProtocol: previous);
+        ReleaseBuilder builder = new(project.Context, project.Signer);
+        var (before, _) = await builder.BuildAsync("2026.09.26.1");
+        string config = Path.Combine(project.Root, "config", "product.json");
+        Assert.Equal(0, await Program.Main(["prepare", "--config", config, "--full-client",
+            "--release", "2026.09.26.2", "--content-version", "2", "--source", source,
+            "--base", "2026.09.26.1", "--launcher-ticket-protocol", desired.ToString()]));
+        var info = JsonSerializer.Deserialize<ReleaseInfo>(
+            await File.ReadAllTextAsync(Path.Combine(project.Context.CandidatePath("2026.09.26.2"), "release-info.json")),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+        Assert.Empty(info.Changes);
+        var (after, report) = await builder.BuildAsync("2026.09.26.2");
+        Assert.Equal(desired, after.LauncherTicketProtocol);
+        Assert.Equal(before.Files.Select(file => file.Sha256), after.Files.Select(file => file.Sha256));
+        Assert.Equal(0, report.NewLocalChunkCount);
+        // An explicitly unchanged protocol must not bypass the no-change check.
+        await Assert.ThrowsAsync<PatchPublisherException>(() => preparer.PrepareAsync(
+            "2026.09.26.3", 3, source, NoReplacements, "no change", baseReleaseId: "2026.09.26.2",
+            fullClient: true, launcherTicketProtocol: desired));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task FollowUpInheritsTicketProtocolAndCanExplicitlyDowngrade(bool downgrade)
