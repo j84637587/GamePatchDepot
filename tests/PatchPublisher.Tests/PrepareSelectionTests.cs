@@ -29,7 +29,7 @@ public sealed class PrepareSelectionTests
         var (manifest, _) = await builder.BuildAsync("2026.09.26.2");
         Assert.Contains(manifest.Files, file => file.Path == "bin/Game.exe");
         await new LocalReleaseVerifier(project.Context, catalog).VerifyAsync(manifest.ReleaseId);
-        var (rollback, _) = await new RollbackBuilder(project.Context, project.Signer, catalog)
+        ReleaseManifest rollback = await new RollbackBuilder(project.Context, project.Signer, catalog)
             .BuildAsync("2026.09.26.3", 3, manifest.ReleaseId);
         Assert.Contains(rollback.Files, file => file.Path == "bin/Game.exe");
     }
