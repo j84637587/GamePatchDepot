@@ -80,6 +80,7 @@ public sealed class PrepareSelectionTests
     {
         await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
         string source = await CreateSourceAsync(project);
+        await File.WriteAllBytesAsync(Path.Combine(source, "Helper.exe"), [1]);
         ReleaseCatalog catalog = new(project.Context, project.Signer);
         CandidatePreparer preparer = new(project.Context, catalog);
         await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true, minimumLauncherVersion: "1.1.1",
@@ -87,6 +88,7 @@ public sealed class PrepareSelectionTests
         ReleaseBuilder builder = new(project.Context, project.Signer);
         var (before, _) = await builder.BuildAsync("2026.09.26.1");
         await project.MarkAsLegacyProtocolAsync("2026.09.26.1");
+        await File.WriteAllBytesAsync(Path.Combine(source, "Helper.exe"), [2]);
         await Assert.ThrowsAsync<PatchPublisherException>(() => preparer.PrepareAsync(
             "2026.09.26.2", 2, source, NoReplacements, "unchanged", baseReleaseId: "2026.09.26.1",
             fullClient: true, minimumLauncherVersion: "1.1.1"));
@@ -99,7 +101,7 @@ public sealed class PrepareSelectionTests
         var info = JsonSerializer.Deserialize<ReleaseInfo>(
             await File.ReadAllTextAsync(Path.Combine(project.Context.CandidatePath("2026.09.26.2"), "release-info.json")),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
-        Assert.Equal("Game.exe", Assert.Single(info.Changes).Path);
+        Assert.Contains(info.Changes, change => change.Path == "Game.exe");
         string candidateExecutable = Path.Combine(project.Context.CandidatePath("2026.09.26.2"), "files", "Game.exe");
         await File.WriteAllBytesAsync(candidateExecutable, oldExecutable);
         var failure = await Assert.ThrowsAsync<PatchPublisherException>(() => builder.BuildAsync("2026.09.26.2"));
@@ -107,8 +109,8 @@ public sealed class PrepareSelectionTests
         File.Copy(Path.Combine(source, "Game.exe"), candidateExecutable, true);
         var (after, report) = await builder.BuildAsync("2026.09.26.2");
         Assert.Equal(2, after.LauncherTicketProtocol);
-        Assert.Equal(before.Files.Where(file => file.Path != "Game.exe").Select(file => file.Sha256),
-            after.Files.Where(file => file.Path != "Game.exe").Select(file => file.Sha256));
+        Assert.Equal(before.Files.Where(file => !file.Path.EndsWith(".exe")).Select(file => file.Sha256),
+            after.Files.Where(file => !file.Path.EndsWith(".exe")).Select(file => file.Sha256));
         Assert.Equal(1, report.NewLocalChunkCount);
         // An explicitly unchanged protocol must not bypass the no-change check.
         await Assert.ThrowsAsync<PatchPublisherException>(() => preparer.PrepareAsync(

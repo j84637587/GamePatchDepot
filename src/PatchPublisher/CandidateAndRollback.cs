@@ -89,7 +89,13 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 if (selection is null && !installFiles.Contains(replacement, StringComparer.OrdinalIgnoreCase))
                     throw new PatchPublisherException($"替換目標必須存在於來源且未被排除：{replacement}");
             }
-            if (fullClient) policy.ValidateRequired(installFiles);
+            if (fullClient)
+            {
+                policy.ValidateRequired(installFiles);
+                PathPolicy.ValidateInstallPath(context.Config.GameExecutable);
+                if (!installFiles.Contains(context.Config.GameExecutable, StringComparer.OrdinalIgnoreCase))
+                    throw new PatchPublisherException($"完整客戶端缺少遊戲主程式：{context.Config.GameExecutable}");
+            }
             List<string> deleted = fullClient
                 ? baseFiles.Keys.Except(installFiles, StringComparer.OrdinalIgnoreCase).Where(path => !policy.IsExcluded(path)).ToList()
                 : [];
@@ -144,7 +150,7 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
 
             const int selectedProtocol = 2;
             bool protocolChanged = baseManifest is not null && selectedProtocol != baseManifest.LauncherTicketProtocol;
-            if (protocolChanged && !changes.Any(change => change.Path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)))
+            if (protocolChanged && !changes.Any(change => string.Equals(change.Path, context.Config.GameExecutable, StringComparison.OrdinalIgnoreCase)))
                 throw new PatchPublisherException("舊票證協定遷移必須交付已更新的遊戲 EXE，不能只修改協定欄位。");
             bool minimumChanged = baseManifest is not null && selectedMinimum != baseManifest.MinimumLauncherVersion;
             if (baseManifest is not null && !protocolChanged && !minimumChanged && changes.Count == 0 && deleted.Count == 0 &&

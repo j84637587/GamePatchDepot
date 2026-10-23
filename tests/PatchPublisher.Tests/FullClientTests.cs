@@ -133,6 +133,7 @@ public sealed class FullClientTests
         await project.CreateCandidateAsync("2026.09.26.1", 1, new Dictionary<string, byte[]> { ["UI.nx"] = [1] });
         ReleaseBuilder builder = new(project.Context, project.Signer);
         await builder.BuildAsync("2026.09.26.1");
+        await project.MarkAsLegacyProtocolAsync("2026.09.26.1", nxOnly: true);
         string source = Path.Combine(project.Root, "client");
         Directory.CreateDirectory(source);
         await File.WriteAllBytesAsync(Path.Combine(source, "UI.nx"), [1]);

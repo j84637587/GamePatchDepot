@@ -20,6 +20,8 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
         }
 
         ReleaseInfo releaseInfo = await LoadAndValidateReleaseInfoAsync(candidatePath, releaseId, cancellationToken);
+        if (releaseInfo.SchemaVersion == 1 && string.IsNullOrWhiteSpace(releaseInfo.BaseReleaseId))
+            throw new PatchPublisherException("首次發布必須使用完整客戶端，不能只更新 NX。");
         bool fullClient = releaseInfo.SchemaVersion == 2;
         string payloadRoot = fullClient ? Path.Combine(candidatePath, "files") : candidatePath;
         ReleaseCatalog versionCatalog = new(context, signer);
@@ -127,7 +129,7 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
             .OrderBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (migratingLegacyProtocol && !orderedManifestFiles.Any(file =>
-            file.Path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(file.Path, context.Config.GameExecutable, StringComparison.OrdinalIgnoreCase) &&
             (!baseFiles.TryGetValue(file.Path, out ManifestFile? old) || file.Sha256 != old.Sha256)))
             throw new PatchPublisherException("舊票證協定遷移必須交付已更新的遊戲 EXE，不能只修改協定欄位。");
         List<string> deletePaths = releaseInfo.Delete
@@ -325,6 +327,9 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
             PathPolicy.ValidateFileSet(releaseInfo.FullClientFiles);
             ClientFilePolicy policy = ClientFilePolicy.Load(context.ProjectRoot);
             policy.ValidateRequired(releaseInfo.FullClientFiles);
+            PathPolicy.ValidateInstallPath(context.Config.GameExecutable);
+            if (!releaseInfo.FullClientFiles.Contains(context.Config.GameExecutable, StringComparer.OrdinalIgnoreCase))
+                throw new PatchPublisherException($"完整客戶端缺少遊戲主程式：{context.Config.GameExecutable}");
             List<string> all = ClientFilePolicy.EnumerateFiles(candidatePath);
             if (all.Any(path => path != "release-info.json" && !path.StartsWith("files/", StringComparison.Ordinal)))
                 throw new PatchPublisherException("完整客戶端 Candidate 內容必須位於 files 子目錄。");
