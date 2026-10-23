@@ -410,8 +410,8 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
             PatchJsonContext.Default.ReleaseInfo,
             cancellationToken) ?? throw new PatchPublisherException("release-info.json 格式錯誤。");
 
-        if (releaseInfo.LauncherTicketProtocol is not (1 or 2))
-            throw new PatchPublisherException("不支援的 launcherTicketProtocol（僅支援 1 或 2）。");
+        if (releaseInfo.LauncherTicketProtocol != 2)
+            throw new PatchPublisherException("舊票證協定已移除，請使用支援新交接的 NovaStory 重新 Prepare（launcherTicketProtocol 必須是 2）。");
         if (releaseInfo.SchemaVersion is not (1 or 2))
             throw new PatchPublisherException("不支援的 Candidate Schema。");
 

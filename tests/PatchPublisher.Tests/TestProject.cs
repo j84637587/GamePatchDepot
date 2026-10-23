@@ -73,6 +73,7 @@ internal sealed class TestProject : IAsyncDisposable
         }
         ReleaseInfo info = new()
         {
+            LauncherTicketProtocol = 2,
             ReleaseId = releaseId,
             ContentVersion = contentVersion,
             GameVersion = "TEST",
@@ -84,6 +85,15 @@ internal sealed class TestProject : IAsyncDisposable
             Path.Combine(candidate, "release-info.json"),
             JsonSerializer.SerializeToUtf8Bytes(info, PatchJsonContext.Default.ReleaseInfo));
         return candidate;
+    }
+
+    public async Task MarkAsLegacyProtocolAsync(string releaseId)
+    {
+        var json = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllBytesAsync(Context.ManifestPath(releaseId)))!.AsObject();
+        json.Remove("launcherTicketProtocol");
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json.ToJsonString());
+        await File.WriteAllBytesAsync(Context.ManifestPath(releaseId), bytes);
+        await File.WriteAllTextAsync(Context.ManifestSignaturePath(releaseId), Signer.Sign(bytes));
     }
 
     public ValueTask DisposeAsync()

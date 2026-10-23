@@ -14,6 +14,25 @@ public sealed partial class RemoteVerificationTests
     private const string ReleaseId = "2026.09.26.1";
 
     [Fact]
+    public async Task LegacyHistoryCanBeVerifiedButCannotBePromotedOrRolledBack()
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
+        FakeS3Client client = await SeedAsync(project);
+        await project.MarkAsLegacyProtocolAsync(ReleaseId);
+        client.Objects[ObjectKeys.ForManifest(ReleaseId)] = await File.ReadAllBytesAsync(project.Context.ManifestPath(ReleaseId));
+        client.Objects[ObjectKeys.ForManifestSignature(ReleaseId)] = await File.ReadAllBytesAsync(project.Context.ManifestSignaturePath(ReleaseId));
+        await using R2ObjectStore store = new(client, "test-bucket");
+        RemoteReleaseService service = Service(project, store);
+        var (legacy, _) = await service.VerifyRemoteAsync(ReleaseId, false);
+        Assert.Equal(1, legacy.LauncherTicketProtocol);
+        var error = await Assert.ThrowsAsync<PatchPublisherException>(() => service.PromoteAsync(ReleaseId, "test"));
+        Assert.Contains("舊票證協定", error.Message);
+        Assert.False(client.Objects.ContainsKey(ObjectKeys.ForChannel("test")));
+        var rollback = new RollbackBuilder(project.Context, project.Signer, new ReleaseCatalog(project.Context, project.Signer));
+        await Assert.ThrowsAsync<PatchPublisherException>(() => rollback.BuildAsync("2026.09.26.2", 2, ReleaseId));
+    }
+
+    [Fact]
     public async Task UploadIncludesAdditionalPatchAndRemoteDeepVerificationChecksIt()
     {
         await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);

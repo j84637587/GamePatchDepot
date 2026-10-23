@@ -17,8 +17,8 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
         PrepareSelection? selection = null,
         int? launcherTicketProtocol = null)
     {
-        if (launcherTicketProtocol is not null and not (1 or 2))
-            throw new PatchPublisherException("launcherTicketProtocol 僅支援 1 或 2。");
+        if (launcherTicketProtocol is not null and not 2)
+            throw new PatchPublisherException("舊票證協定已移除，僅支援 launcherTicketProtocol 2。");
         context.EnsureDirectories();
         if (contentVersion <= 0)
         {
@@ -136,7 +136,7 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 });
             }
 
-            int selectedProtocol = launcherTicketProtocol ?? baseManifest?.LauncherTicketProtocol ?? 1;
+            const int selectedProtocol = 2;
             bool protocolChanged = baseManifest is not null && selectedProtocol != baseManifest.LauncherTicketProtocol;
             if (baseManifest is not null && !protocolChanged && changes.Count == 0 && deleted.Count == 0 &&
                 (!fullClient || baseManifest.SchemaVersion == 2 && baseFiles.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(installFiles) &&
@@ -256,6 +256,8 @@ public sealed class RollbackBuilder(ProjectContext context, SigningService signe
         }
 
         (ReleaseManifest target, _, _) = await catalog.LoadVerifiedAsync(targetReleaseId, cancellationToken);
+        if (target.LauncherTicketProtocol != 2)
+            throw new PatchPublisherException("此回滾目標使用已移除的舊票證協定，請選擇支援新交接的版本。");
         if (newContentVersion <= target.ContentVersion)
         {
             throw new PatchPublisherException("回滾版本的 contentVersion 仍必須高於目標內容版本。");

@@ -19,6 +19,7 @@ public sealed class ActualNxSmokeTests
         File.Copy(source, Path.Combine(candidate, "UI.nx"));
         ReleaseInfo info = new()
         {
+            LauncherTicketProtocol = 2,
             ReleaseId = "2026.09.23.1",
             ContentVersion = 1008,
             GameVersion = "TEST",

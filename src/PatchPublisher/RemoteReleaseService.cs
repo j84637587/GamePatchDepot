@@ -244,6 +244,8 @@ public sealed class RemoteReleaseService(
             cancellationToken);
 
         (ReleaseManifest manifest, string manifestSha256) = await VerifyRemoteAsync(releaseId, false, cancellationToken);
+        if (manifest.LauncherTicketProtocol != 2)
+            throw new PatchPublisherException("舊票證協定已移除，此版本不可發布頻道；請先建立支援新交接的版本。");
         string manifestKey = ObjectKeys.ForManifest(releaseId);
 
         string channelKey = ObjectKeys.ForChannel(channel);
