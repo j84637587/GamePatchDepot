@@ -1163,7 +1163,7 @@ public partial class MainWindow : Window
                 if (!document.RootElement.TryGetProperty("minimumLauncherVersion", out JsonElement minimum) ||
                     minimum.ValueKind != JsonValueKind.String || minimum.GetString() is not string minimumText ||
                     minimumText.Split('.').Length != 3 || !Version.TryParse(minimumText, out Version? minimumVersion) ||
-                    minimumVersion <= new Version(1, 1, 0))
+                    minimumVersion.ToString() != minimumText || minimumVersion <= new Version(1, 1, 0))
                 {
                     continue;
                 }

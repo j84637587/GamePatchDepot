@@ -11,6 +11,7 @@ public sealed class PrepareSelectionTests
     [InlineData("1.0.0", false)]
     [InlineData("1.1.0", false)]
     [InlineData("invalid", false)]
+    [InlineData("1.01.1", false)]
     [InlineData(null, true)]
     [InlineData("1.1.0", true)]
     public async Task TransitionRequiresCompatibleMinimumVersion(string? minimum, bool legacyBase)
