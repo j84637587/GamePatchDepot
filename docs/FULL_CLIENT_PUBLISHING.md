@@ -109,4 +109,4 @@ Upload 後按「R2 深度驗證」。工具會先驗證本機與遠端 Manifest 
 - Prepare 完成、Build 之前，在該 Candidate 的 `release-info.json` 加上 `"launcherTicketProtocol": 2`，再照原流程 Build、驗證及發布 Test。
 - 測試確認後再發布 Stable。舊遊戲請維持 `1` 或不填；請勿直接修改已簽章的 Manifest。回滾會沿用目標版本的協定。
 
-協定欄位會納入 Manifest 簽章；它是發布者對遊戲能力的聲明，工具無法代替實際遊戲驗證。省略欄位時預設使用舊交接方式，以相容已發布版本。
+協定欄位會納入 Manifest 簽章；它是發布者對遊戲能力的聲明，工具無法代替實際遊戲驗證。第一次未設定時使用舊交接方式，以相容已發布版本；後續 Candidate 自動沿用基準版本的協定與最低 NovaLink 版本，不必每次重填。若要降回舊模式，需在 Build 前明確設為 `1`。舊模式不新增 Manifest 欄位，以保留既有不可變清單的相容性。

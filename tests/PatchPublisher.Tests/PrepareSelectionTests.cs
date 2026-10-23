@@ -6,6 +6,40 @@ public sealed class PrepareSelectionTests
 {
     private static readonly Dictionary<string, string> NoReplacements = new();
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FollowUpInheritsTicketProtocolAndCanExplicitlyDowngrade(bool downgrade)
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
+        string source = await CreateSourceAsync(project);
+        ReleaseCatalog catalog = new(project.Context, project.Signer);
+        CandidatePreparer preparer = new(project.Context, catalog);
+        ReleaseBuilder builder = new(project.Context, project.Signer);
+        string first = await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true);
+        string firstInfo = Path.Combine(first, "release-info.json");
+        var info = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(firstInfo))!;
+        info["launcherTicketProtocol"] = 2;
+        info["minimumLauncherVersion"] = "1.1.0";
+        await File.WriteAllTextAsync(firstInfo, info.ToJsonString());
+        await builder.BuildAsync("2026.09.26.1");
+        await File.AppendAllTextAsync(Path.Combine(source, "Game.exe"), "changed");
+        string next = await preparer.PrepareAsync("2026.09.26.2", 2, source, NoReplacements, "follow-up",
+            baseReleaseId: "2026.09.26.1", fullClient: true);
+        string nextInfo = Path.Combine(next, "release-info.json");
+        info = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(nextInfo))!;
+        Assert.Equal(2, info["launcherTicketProtocol"]!.GetValue<int>());
+        Assert.Equal("1.1.0", info["minimumLauncherVersion"]!.GetValue<string>());
+        if (downgrade)
+        {
+            info["launcherTicketProtocol"] = 1;
+            await File.WriteAllTextAsync(nextInfo, info.ToJsonString());
+        }
+        var (manifest, _) = await builder.BuildAsync("2026.09.26.2");
+        Assert.Equal(downgrade ? 1 : 2, manifest.LauncherTicketProtocol);
+        Assert.Equal("1.1.0", manifest.MinimumLauncherVersion);
+    }
+
     [Fact]
     public async Task CliPreviewAndPrepareUseTheConfirmedSelection()
     {

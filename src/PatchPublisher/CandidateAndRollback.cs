@@ -149,6 +149,8 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 ReleaseId = releaseId,
                 ContentVersion = contentVersion,
                 GameVersion = context.Config.GameVersion,
+                MinimumLauncherVersion = baseManifest?.MinimumLauncherVersion ?? "1.0.0",
+                LauncherTicketProtocol = baseManifest?.LauncherTicketProtocol ?? 1,
                 SourceDirectory = sourceRoot,
                 CreatedAt = DateTimeOffset.UtcNow,
                 BaseReleaseId = baseReleaseId,
