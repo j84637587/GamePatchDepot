@@ -35,8 +35,7 @@ public sealed class ManifestDiffTests
 
         Assert.Single(report.Changed);
         Assert.Equal("B.nx", report.Changed[0].Path);
-        Assert.Single(report.Unchanged);
-        Assert.Equal("A.nx", report.Unchanged[0]);
+        Assert.Equal(new[] { "A.nx", "Game.exe" }, report.Unchanged);
         Assert.Equal(3000, report.NewUniqueChunkBytes);
     }
 

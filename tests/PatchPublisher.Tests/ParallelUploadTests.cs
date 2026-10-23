@@ -107,7 +107,7 @@ public sealed partial class RemoteVerificationTests
         await using TestProject project = await TestProject.CreateAsync(UploadNames());
         ReleaseManifest manifest = await BuildUploadFixtureAsync(project);
         FakeS3Client client = new();
-        ManifestChunk chunk = manifest.Files.Single(file => file.Path == "UI.nx").Chunks[0];
+        ManifestChunk chunk = manifest.Files.First(file => file.Chunks.Count > 0).Chunks[0];
         if (failure == "local-corrupt")
             await File.WriteAllBytesAsync(ObjectKeys.LocalChunkPath(project.Context.ChunkRoot, chunk.Sha256), [9, 9, 9]);
         else if (failure == "remote-size") client.Objects[chunk.Key] = [9];

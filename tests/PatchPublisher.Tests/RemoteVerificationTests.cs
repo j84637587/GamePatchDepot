@@ -85,7 +85,7 @@ public sealed partial class RemoteVerificationTests
         // 這裡只測試傳輸／GC；真實補丁格式與套用由 DeltaPatchTests 驗證。
         string hash = FileUtilities.Sha256Hex([8]);
         FileDeltaPatch patch = new() { BaseSha256 = new string('a', 64), BaseSize = 3, Sha256 = hash, Size = 1, Key = ObjectKeys.ForPatch(hash) };
-        RewriteManifest(project, client, manifest => manifest["files"]![0]!["patch"] = JsonSerializer.SerializeToNode(
+        RewriteManifest(project, client, manifest => manifest["files"]!.AsArray().Single(file => file!["path"]!.GetValue<string>() == "UI.nx")!["patch"] = JsonSerializer.SerializeToNode(
             patch, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
         await File.WriteAllBytesAsync(project.Context.ManifestPath(ReleaseId), client.Objects[ObjectKeys.ForManifest(ReleaseId)]);
         await File.WriteAllBytesAsync(project.Context.ManifestSignaturePath(ReleaseId), client.Objects[ObjectKeys.ForManifestSignature(ReleaseId)]);
@@ -203,7 +203,7 @@ public sealed partial class RemoteVerificationTests
     {
         await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
         FakeS3Client client = await SeedAsync(project);
-        RewriteManifest(project, client, manifest => manifest["files"]![0]!["sha256"] = new string('a', 64));
+        RewriteManifest(project, client, manifest => manifest["files"]!.AsArray().Single(file => file!["path"]!.GetValue<string>() == "UI.nx")!["sha256"] = new string('a', 64));
         await File.WriteAllBytesAsync(project.Context.ManifestPath(ReleaseId), client.Objects[ObjectKeys.ForManifest(ReleaseId)]);
         await File.WriteAllBytesAsync(project.Context.ManifestSignaturePath(ReleaseId), client.Objects[ObjectKeys.ForManifestSignature(ReleaseId)]);
         await using R2ObjectStore store = new(client, "test-bucket");
