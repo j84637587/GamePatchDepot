@@ -1142,6 +1142,21 @@ public partial class MainWindow : Window
             return releases;
         }
 
+        string gameExecutable;
+        try
+        {
+            using JsonDocument config = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(_projectRoot, "config", "product.json")));
+            gameExecutable = config.RootElement.TryGetProperty("gameExecutable", out JsonElement executable)
+                ? executable.ValueKind == JsonValueKind.String ? executable.GetString()! : throw new InvalidDataException("gameExecutable 必須是字串。")
+                : "NovaStory.exe";
+            gameExecutable = gameExecutable.Replace('\\', '/').Trim();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
+        {
+            AppendLog($"無法讀取遊戲主程式設定，暫不提供退版目標：{exception.Message}", true);
+            return releases;
+        }
+
         foreach (string path in Directory.EnumerateFiles(releaseDirectory, "*.json"))
         {
             string releaseId = Path.GetFileNameWithoutExtension(path);
@@ -1156,6 +1171,13 @@ public partial class MainWindow : Window
             try
             {
                 using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(path));
+                if (!document.RootElement.TryGetProperty("files", out JsonElement files) || files.ValueKind != JsonValueKind.Array ||
+                    !files.EnumerateArray().Any(file => file.ValueKind == JsonValueKind.Object &&
+                        file.TryGetProperty("path", out JsonElement entryPath) && entryPath.ValueKind == JsonValueKind.String &&
+                        string.Equals(entryPath.GetString(), gameExecutable, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
                 if (!document.RootElement.TryGetProperty("launcherTicketProtocol", out JsonElement protocol) ||
                     protocol.ValueKind != JsonValueKind.Number || !protocol.TryGetInt32(out int protocolVersion) || protocolVersion != 2)
                 {
