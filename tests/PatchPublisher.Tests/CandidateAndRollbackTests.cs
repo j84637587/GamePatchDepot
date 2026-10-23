@@ -12,7 +12,8 @@ public sealed class CandidateAndRollbackTests
         await builder.BuildAsync("2026.09.23.1");
         await project.MarkAsLegacyProtocolAsync("2026.09.23.1");
         await project.CreateCandidateAsync("2026.09.23.2", 2,
-            new Dictionary<string, byte[]> { ["UI.nx"] = [2] }, baseReleaseId: "2026.09.23.1");
+            new Dictionary<string, byte[]> { ["UI.nx"] = [2] },
+            changes: [new ReleaseChange { Path = "UI.nx" }], baseReleaseId: "2026.09.23.1");
         var error = await Assert.ThrowsAsync<PatchPublisherException>(() => builder.BuildAsync("2026.09.23.2"));
         Assert.Contains("完整客戶端", error.Message);
         Assert.False(File.Exists(project.Context.ManifestPath("2026.09.23.2")));
