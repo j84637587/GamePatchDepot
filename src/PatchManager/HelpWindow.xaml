@@ -21,7 +21,7 @@
             <StackPanel>
                 <GroupBox Header="目前支援範圍">
                     <TextBlock TextWrapping="Wrap" LineHeight="24"
-                               Text="新版本支援完整客戶端：EXE、DLL、NX 與子目錄。舊 NX 版本仍可驗證與查閱，畫面會顯示目前版本的範圍。&#x0a;&#x0a;來源必須是可正常執行的完整客戶端。maplelink 的玩家端自動安裝、更新與修復仍待串接。" />
+                               Text="新發布只接受完整客戶端：EXE、DLL、NX 與子目錄。舊 NX 版本仍可驗證與查閱，畫面會顯示目前版本的範圍。&#x0a;&#x0a;來源必須包含支援新登入流程的新版遊戲主程式。請先在 Test 驗證更新、啟動與登入，再發布 Stable。" />
                 </GroupBox>
                 <GroupBox Header="1. 先填好左邊欄位">
                     <TextBlock TextWrapping="Wrap" LineHeight="24">
@@ -29,6 +29,8 @@
                         <Run FontWeight="Bold" Text="Content Version："/><Run Text="系統會從遠端頻道與本機版本自動計算，不用填，也不能修改。&#x0a;"/>
                         <Run FontWeight="Bold" Text="更新說明："/><Run Text="一句話寫清楚改了什麼。例如「fix(ui): 修正登入畫面」。&#x0a;"/>
                         <Run FontWeight="Bold" Text="完整客戶端目錄："/><Run Text="選擇含遊戲 EXE、DLL、資源及子目錄的根目錄。Prepare 只保存有變更的檔案；第一版才保存全部收錄檔案。&#x0a;"/>
+                        <Run FontWeight="Bold" Text="最低 NovaLink 版本："/><Run Text="首次發布／遷移填已發布且支援新交接的版本，須高於 1.1.0。後續留空可沿用相容基準。&#x0a;"/>
+                        <Run FontWeight="Bold" Text="建立新完整基準："/><Run Text="舊版只有 NX 時才勾，來源選本次已驗證的新編譯產物；一般差異更新不用勾。&#x0a;"/>
                         <Run FontWeight="Bold" Text="UI 替換檔："/><Run Text="需要用 UI40.nx 等其他檔案取代來源目錄的 UI.nx 時才選。留白時仍會比較並使用來源目錄的 UI.nx。"/>
                     </TextBlock>
                 </GroupBox>
@@ -58,7 +60,7 @@
                 </GroupBox>
                 <GroupBox Header="5. 要退回舊版本">
                     <TextBlock TextWrapping="Wrap" LineHeight="24"
-                               Text="按右上角「建立退版」→ 選擇舊版本 → 建立。系統會自動產生新的 Release ID 與 Content Version。&#x0a;&#x0a;建立後從「本機驗證」開始，接著 Upload、R2 深度驗證、發布 Test；測試正常後才發布 Stable。" />
+                               Text="按右上角「建立退版」→ 選擇支援新交接的完整客戶端版本 → 建立。系統會自動產生新的 Release ID 與 Content Version。&#x0a;&#x0a;建立後從「本機驗證」開始，接著 Upload、R2 深度驗證、發布 Test；測試正常後才發布 Stable。" />
                 </GroupBox>
                 <GroupBox Header="6. 取消或回退">
                     <TextBlock TextWrapping="Wrap" LineHeight="24"

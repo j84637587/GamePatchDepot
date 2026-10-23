@@ -178,7 +178,7 @@ public static class Program
         Console.WriteLine($"Candidate 已建立：{path}");
         ReleaseInfo info = System.Text.Json.JsonSerializer.Deserialize(await File.ReadAllBytesAsync(Path.Combine(path, "release-info.json"), cancellationToken),
             PatchJsonContext.Default.ReleaseInfo)!;
-        Console.WriteLine($"模式：{(info.SchemaVersion == 2 ? "完整客戶端" : "舊版 NX")}");
+        Console.WriteLine("範圍：完整客戶端");
         Console.WriteLine($"Candidate 僅保存 {info.Changes.Count} 個變更檔案。");
         if (info.FullClientFiles is not null)
             Console.WriteLine($"完整版本收錄 {info.FullClientFiles.Count} 個檔案，移除 {info.Delete.Count} 個，排除 {info.ExcludedFiles.Count} 個。");

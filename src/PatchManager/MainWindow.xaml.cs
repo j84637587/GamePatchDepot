@@ -900,7 +900,7 @@ public partial class MainWindow : Window
                 bool fullClient = metadata.RootElement.TryGetProperty("schemaVersion", out JsonElement schema) && schema.GetInt32() == 2;
                 ReleaseScopeText.Text = fullClient
                     ? "目前版本：完整客戶端。Candidate 只保存變更檔案，Manifest 記錄完整內容。"
-                    : "目前版本：舊版 NX。仍可繼續原流程；新建版本將使用完整客戶端模式。";
+                    : "目前版本：舊版 NX，僅供歷史查驗；請使用新版遊戲建立新完整基準。";
             }
             catch (JsonException) { ReleaseScopeText.Text = "版本資料無法讀取，請檢查 Candidate／Manifest。"; }
         }
