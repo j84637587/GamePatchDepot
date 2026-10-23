@@ -488,9 +488,9 @@ Game Patch Depot - PatchPublisher
   launcher-status
   keygen --private <path> [--public <path>]
   preview --source <dir> --output <selection.json> [--base <release-id>] [--replace UI.nx=<path>]
-  prepare --release <id> --content-version <n> --source <dir>
-          [--minimum-launcher-version <x.y.z>]
-          [--full-client] [--selection <selection.json>] [--base <release-id>] [--replace UI.nx=<path>] [--description <text>]
+  prepare --full-client --release <id> --content-version <n> --source <dir>
+          [--minimum-launcher-version <x.y.z>] (required for first publication / legacy migration)
+          [--selection <selection.json>] [--base <release-id>] [--replace UI.nx=<path>] [--description <text>]
           [--launcher-ticket-protocol 2]
   build --release <id>
   rollback --release <new-id> --content-version <n> --to <old-id>

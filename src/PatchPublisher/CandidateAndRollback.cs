@@ -94,9 +94,9 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
             if (fullClient)
             {
                 policy.ValidateRequired(installFiles);
-                PathPolicy.ValidateInstallPath(context.Config.GameExecutable);
-                if (!installFiles.Contains(context.Config.GameExecutable, StringComparer.OrdinalIgnoreCase))
-                    throw new PatchPublisherException($"完整客戶端缺少遊戲主程式：{context.Config.GameExecutable}");
+                PathPolicy.ValidateInstallPath(context.GameExecutable);
+                if (!installFiles.Contains(context.GameExecutable, StringComparer.OrdinalIgnoreCase))
+                    throw new PatchPublisherException($"完整客戶端缺少遊戲主程式：{context.GameExecutable}");
             }
             List<string> deleted = fullClient
                 ? baseFiles.Keys.Except(installFiles, StringComparer.OrdinalIgnoreCase).Where(path => !policy.IsExcluded(path)).ToList()
@@ -152,7 +152,7 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
 
             const int selectedProtocol = 2;
             bool protocolChanged = baseManifest is not null && selectedProtocol != baseManifest.LauncherTicketProtocol;
-            if (protocolChanged && !changes.Any(change => string.Equals(change.Path, context.Config.GameExecutable, StringComparison.OrdinalIgnoreCase)))
+            if (protocolChanged && !changes.Any(change => string.Equals(change.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase)))
                 throw new PatchPublisherException("舊票證協定遷移必須交付已更新的遊戲 EXE，不能只修改協定欄位。");
             bool minimumChanged = baseManifest is not null && selectedMinimum != baseManifest.MinimumLauncherVersion;
             if (baseManifest is not null && !protocolChanged && !minimumChanged && changes.Count == 0 && deleted.Count == 0 &&
@@ -275,7 +275,7 @@ public sealed class RollbackBuilder(ProjectContext context, SigningService signe
         (ReleaseManifest target, _, _) = await catalog.LoadVerifiedAsync(targetReleaseId, cancellationToken);
         if (target.LauncherTicketProtocol != 2)
             throw new PatchPublisherException("此回滾目標使用已移除的舊票證協定，請選擇支援新交接的版本。");
-        if (target.SchemaVersion != 2 || !target.Files.Any(file => string.Equals(file.Path, context.Config.GameExecutable, StringComparison.OrdinalIgnoreCase)))
+        if (target.SchemaVersion != 2 || !target.Files.Any(file => string.Equals(file.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase)))
             throw new PatchPublisherException("回滾目標必須是包含遊戲主程式的完整客戶端版本。");
         LauncherTicketPolicy.ValidateMinimumVersion(target.MinimumLauncherVersion);
         if (newContentVersion <= target.ContentVersion)

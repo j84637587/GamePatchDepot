@@ -6,12 +6,12 @@
 
 1. 準備可以正常執行的客戶端根目錄，包含 EXE、DLL、NX 與必要子目錄。不要選只有 NX 的資料夾。
 2. 檢查 `config/client-files.json` 的排除、保留與必備檔案設定。
-3. 打開 PatchManager，使用新的 Release ID，選擇「完整客戶端目錄」。若畫面回到舊 Candidate，先完成或取消舊版本，再建立新版本；既有 NX Candidate 不會自動變成完整客戶端。
+3. 打開 PatchManager，使用新的 Release ID，選擇「完整客戶端目錄」。首次發布／遷移時填寫已發布相容版本的「最低 NovaLink 版本」。若畫面回到舊 Candidate，先完成或取消舊版本，再建立新版本；既有 NX Candidate 不會自動變成完整客戶端。
 4. 按 Prepare，先在檔案清單勾選收錄項目。不想發布的取消勾選，再按「確認並建立 Candidate」。確認前不會複製檔案；取消視窗不會建立 Candidate。來源目錄本身不會被改動。
 5. 確認後 Build，再執行本機驗證與 Diff。一般更新的本機驗證只讀新增或變更的檔案；第一版或沒有基準資料時讀取全部。若有檔案要移除，UI 會在 Build 前要求確認。
 6. 確認內容後才 Upload、R2 深度驗證、發布 Test。完整客戶端玩家端串接及遊戲測試完成後再發布 Stable。
 
-目前只檢查「至少有一個 EXE」與你設定的必備檔案，不能據此證明客戶端能正常遊玩。請把真正的遊戲 EXE 與必要 DLL 加入 `requiredFiles`，並保留遊戲測試流程。
+工具會檢查 `gameExecutable` 指定的遊戲主程式與必備檔案，但不能據此證明可以正常遊玩。請把必要 DLL 加入 `requiredFiles`，並保留遊戲測試流程。
 
 ## 收錄規則
 
@@ -19,16 +19,14 @@
 
 ### 勾選範例
 
-| 檔案 | 怎麼選 | 結果 |
-|---|---|---|
-| `Game.exe`、`data/UI.nx` | 保持「收錄」勾選 | 納入完整版本；相同內容不再複製 |
-| `settings.ini` | 取消「收錄」 | 不發布；舊版若已追蹤，改為保留玩家現有檔案 |
-| `obsolete.dll`（舊版有） | 取消「收錄」，再勾「從新版移除」 | 列入新版刪除清單，不刪除本機來源 |
-| `secret.pem` | 規則排除，不能勾選 | 不收錄；如確有需要，先修改規則再重新掃描 |
+- 遊戲主程式與 `data/UI.nx`：保持「收錄」；相同內容不再複製。
+- `settings.ini`：取消「收錄」後停止發布，保留玩家現有檔案。
+- 舊版的 `obsolete.dll`：取消「收錄」並勾「從新版移除」，列入新版刪除清單；不刪本機來源。
+- `secret.pem`：由規則排除；確有需要時，先修改規則再重新掃描。
 
 「收錄」是完整版本應有的檔案，不是只有本次修改的檔案。沒改動的遊戲檔案也要保持勾選。
 
-可搜尋相對路徑，對搜尋結果批次勾選／取消，或重設全部。畫面的容量是所選檔案總量，不是新增上傳量。檔名與說明太長時可懸停查看。至少須保留一個 EXE，以及 `requiredFiles` 指定的檔案。
+可搜尋相對路徑，對搜尋結果批次勾選／取消，或重設全部。畫面的容量是所選檔案總量，不是新增上傳量。檔名與說明太長時可懸停查看。必須保留 `gameExecutable` 指定的遊戲主程式與 `requiredFiles` 指定的檔案。
 
 預覽只讀取清單、大小與修改時間，不先雜湊大型檔案。確認時會重新檢查來源、替換檔、規則與基準；若清單、大小或修改時間有變化，會要求重新掃描。這不是對檔案內容的鎖定，Prepare 期間仍不要修改來源。
 
@@ -66,20 +64,21 @@ Build 輸出的 schemaVersion 2 Manifest 記錄完整版本。未變更的檔案
 
 第一次由 NX 基準轉成完整客戶端時，相同路徑且相同內容的 NX 可重用既有 chunks。新 schema 沿用目前 R2 路徑、簽章與單調遞增版本；沒有新增 bucket 或自動切換頻道。分塊仍使用 `product.json` 中的既有設定，目前為 256 MiB。
 
-目前 UI 已有完整客戶端版本可退版時，只列出完整客戶端目標，避免誤選只有 NX 的版本。CLI 維護舊 NX 時仍可明確指定舊版；操作人員不可把 NX-only 清單當作完整客戶端退版。
+UI 與 CLI 只允許回滾至支援新交接的完整客戶端；舊 NX 清單及舊票證協定只能供歷史查驗。
 
 ## CLI 範例
 
 下面的來源路徑及版本號是示意，請換成實際值；第一次發布不加 `--base`。
 
 ```powershell
-.\patch.ps1 prepare --full-client --release 2026.09.26.1 --content-version 4 --source F:\ClientRelease --description "feat(client): 完整客戶端"
+$launcherVersion = Read-Host "已發布且支援新登入流程的 NovaLink 版本（高於 1.1.0）"
+.\patch.ps1 prepare --full-client --minimum-launcher-version $launcherVersion --release 2026.09.26.1 --content-version 4 --source F:\ClientRelease --description "feat(client): 完整客戶端"
 .\patch.ps1 build --release 2026.09.26.1
 .\patch.ps1 verify --release 2026.09.26.1 --local
 .\patch.ps1 diff --release 2026.09.26.1 --against stable
 ```
 
-後續 Prepare 加 `--base <已發布版本>`，或使用 UI 自動選擇發布基準。CLI 不加 `--full-client` 會維持舊 NX 模式。
+後續 Prepare 加 `--base <已發布版本>`，或使用 UI 自動選擇發布基準。每次 Prepare 都必須加 `--full-client`；舊 NX 模式已停止發布。
 
 更新版可用 `verify --release <版本> --local --changed`，依 Candidate 記錄的基準與兩份已簽章 Manifest，只驗證新增、內容或分塊配置變更的檔案；補丁也會驗證。無 Candidate、無基準及第一版自動完整驗證。`verify --local` 始終完整驗證所有檔案，適合定期檢查本機舊分塊。變更驗證通過不代表未變更的本機分塊沒有損壞；後續 R2 深度驗證仍核對雲端完整版本。
 

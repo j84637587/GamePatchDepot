@@ -8,11 +8,15 @@ public sealed class ProjectContext
     {
         ProjectRoot = projectRoot;
         Config = config;
+        GameExecutable = PathPolicy.NormalizeInstallPath(config.GameExecutable ?? "");
+        if (!GameExecutable.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            throw new PatchPublisherException("gameExecutable 必須是遊戲主程式的相對 EXE 路徑。");
         AllowedFiles = allowedFiles;
     }
 
     public string ProjectRoot { get; }
     public ProductConfig Config { get; }
+    public string GameExecutable { get; }
     public HashSet<string> AllowedFiles { get; }
     public string CandidateRoot => Resolve(Config.CandidateRoot);
     public string ChunkRoot => Resolve(Config.ChunkRoot);

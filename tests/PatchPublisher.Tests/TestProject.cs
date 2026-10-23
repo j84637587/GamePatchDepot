@@ -17,7 +17,7 @@ internal sealed class TestProject : IAsyncDisposable
     public string PrivateKeyPath { get; }
     public SigningService Signer => new(Context.PublicKeyPath, PrivateKeyPath);
 
-    public static async Task<TestProject> CreateAsync(string[] allowedFiles, int chunkSizeMiB = 1, bool enableDeltaPatches = false, int uploadConcurrency = 4)
+    public static async Task<TestProject> CreateAsync(string[] allowedFiles, int chunkSizeMiB = 1, bool enableDeltaPatches = false, int uploadConcurrency = 4, string gameExecutable = "Game.exe")
     {
         string root = Path.Combine(Path.GetTempPath(), "GamePatchDepot.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "config"));
@@ -27,7 +27,7 @@ internal sealed class TestProject : IAsyncDisposable
         {
             Product = "test-product",
             GameVersion = "TEST",
-            GameExecutable = "Game.exe",
+            GameExecutable = gameExecutable,
             CandidateRoot = "work/candidates",
             ChunkRoot = "work/chunks",
             CatalogRoot = "catalog",

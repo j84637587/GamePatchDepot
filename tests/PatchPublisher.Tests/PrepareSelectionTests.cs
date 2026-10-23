@@ -7,6 +7,34 @@ public sealed class PrepareSelectionTests
     private static readonly Dictionary<string, string> NoReplacements = new();
 
     [Fact]
+    public async Task WindowsStyleGameExecutablePathWorksAcrossMigrationAndRollback()
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"], gameExecutable: @"bin\Game.exe");
+        Assert.Equal("bin/Game.exe", project.Context.GameExecutable);
+        string source = Path.Combine(project.Root, "client");
+        Directory.CreateDirectory(Path.Combine(source, "bin"));
+        await File.WriteAllBytesAsync(Path.Combine(source, "UI.nx"), [1]);
+        string executable = Path.Combine(source, "bin", "Game.exe");
+        await File.WriteAllBytesAsync(executable, [2]);
+        ReleaseCatalog catalog = new(project.Context, project.Signer);
+        CandidatePreparer preparer = new(project.Context, catalog);
+        ReleaseBuilder builder = new(project.Context, project.Signer);
+        await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "base",
+            fullClient: true, minimumLauncherVersion: "1.1.1");
+        await builder.BuildAsync("2026.09.26.1");
+        await project.MarkAsLegacyProtocolAsync("2026.09.26.1");
+        await File.WriteAllBytesAsync(executable, [3]);
+        await preparer.PrepareAsync("2026.09.26.2", 2, source, NoReplacements, "migration",
+            baseReleaseId: "2026.09.26.1", fullClient: true, minimumLauncherVersion: "1.1.1");
+        var (manifest, _) = await builder.BuildAsync("2026.09.26.2");
+        Assert.Contains(manifest.Files, file => file.Path == "bin/Game.exe");
+        await new LocalReleaseVerifier(project.Context, catalog).VerifyAsync(manifest.ReleaseId);
+        var (rollback, _) = await new RollbackBuilder(project.Context, project.Signer, catalog)
+            .BuildAsync("2026.09.26.3", 3, manifest.ReleaseId);
+        Assert.Contains(rollback.Files, file => file.Path == "bin/Game.exe");
+    }
+
+    [Fact]
     public async Task MinimumVersionCanRiseWithoutFileChangesButCannotDropBelowBase()
     {
         await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
