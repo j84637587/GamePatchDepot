@@ -9,4 +9,11 @@ public static class LauncherTicketPolicy
             !Version.TryParse(value, out Version? version) || version.ToString() != value || version <= new Version(1, 1, 0))
             throw new PatchPublisherException("請填寫已發布、支援新交接的最低 NovaLink 版本（x.y.z，必須高於不支援的 1.1.0），不可沿用舊版或預設值。");
     }
+
+    public static void ValidateAgainstBase(string? value, string? baseMinimum)
+    {
+        ValidateMinimumVersion(value);
+        if (Version.TryParse(baseMinimum, out Version? inherited) && Version.Parse(value!) < inherited)
+            throw new PatchPublisherException($"最低 NovaLink 版本不可低於基準版本要求的 {baseMinimum}。");
+    }
 }

@@ -72,7 +72,7 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 throw new PatchPublisherException("首次發布或從舊票證協定遷移必須使用 --full-client，包含支援新交接的遊戲 EXE；不能只更新 NX。");
             string? selectedMinimum = minimumLauncherVersion ??
                 (baseManifest?.LauncherTicketProtocol == 2 ? baseManifest.MinimumLauncherVersion : null);
-            LauncherTicketPolicy.ValidateMinimumVersion(selectedMinimum);
+            LauncherTicketPolicy.ValidateAgainstBase(selectedMinimum, baseManifest?.MinimumLauncherVersion);
 
             ClientFilePolicy policy = fullClient ? ClientFilePolicy.Load(context.ProjectRoot) : new();
             List<string> sourceFiles = fullClient ? ClientFilePolicy.EnumerateFiles(sourceRoot) : context.AllowedFiles.ToList();
@@ -144,7 +144,8 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
 
             const int selectedProtocol = 2;
             bool protocolChanged = baseManifest is not null && selectedProtocol != baseManifest.LauncherTicketProtocol;
-            if (baseManifest is not null && !protocolChanged && changes.Count == 0 && deleted.Count == 0 &&
+            bool minimumChanged = baseManifest is not null && selectedMinimum != baseManifest.MinimumLauncherVersion;
+            if (baseManifest is not null && !protocolChanged && !minimumChanged && changes.Count == 0 && deleted.Count == 0 &&
                 (!fullClient || baseManifest.SchemaVersion == 2 && baseFiles.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(installFiles) &&
                     (baseManifest.Preserve ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(preserved!)))
             {

@@ -209,6 +209,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        string minimumLauncherVersion = MinimumLauncherVersionTextBox.Text.Trim();
         List<string> arguments =
         [
             "prepare", "--full-client", "--release", releaseId,
@@ -216,10 +217,10 @@ public partial class MainWindow : Window
             "--source", SourceTextBox.Text.Trim(),
             "--description", DescriptionTextBox.Text.Trim()
         ];
-        if (!string.IsNullOrWhiteSpace(MinimumLauncherVersionTextBox.Text))
+        if (minimumLauncherVersion.Length > 0)
         {
             arguments.Add("--minimum-launcher-version");
-            arguments.Add(MinimumLauncherVersionTextBox.Text.Trim());
+            arguments.Add(minimumLauncherVersion);
         }
         if (!string.IsNullOrWhiteSpace(UiReplacementTextBox.Text))
         {
@@ -255,7 +256,7 @@ public partial class MainWindow : Window
             // 掃描期間若使用者改了欄位，不可拿舊清單建立不同來源的版本。
             if (SourceTextBox.Text.Trim() != source || UiReplacementTextBox.Text.Trim() != replacement ||
                 ReleaseIdTextBox.Text.Trim() != releaseId || ContentVersionTextBox.Text.Trim() != contentVersion ||
-                DescriptionTextBox.Text.Trim() != description)
+                DescriptionTextBox.Text.Trim() != description || MinimumLauncherVersionTextBox.Text.Trim() != minimumLauncherVersion)
             {
                 AppDialog.Warning(this, "欄位已變更", "掃描期間欄位有變更，請重新按 Prepare 確認清單。");
                 return;

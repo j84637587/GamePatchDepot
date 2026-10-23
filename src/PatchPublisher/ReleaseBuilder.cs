@@ -45,6 +45,7 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
             (ReleaseManifest baseManifest, _, _) = await versionCatalog.LoadVerifiedAsync(
                 releaseInfo.BaseReleaseId,
                 cancellationToken);
+            LauncherTicketPolicy.ValidateAgainstBase(releaseInfo.MinimumLauncherVersion, baseManifest.MinimumLauncherVersion);
             foreach (ManifestFile file in baseManifest.Files)
             {
                 baseFiles[file.Path] = file;

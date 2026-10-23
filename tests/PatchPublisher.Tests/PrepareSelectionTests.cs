@@ -6,6 +6,37 @@ public sealed class PrepareSelectionTests
 {
     private static readonly Dictionary<string, string> NoReplacements = new();
 
+    [Fact]
+    public async Task MinimumVersionCanRiseWithoutFileChangesButCannotDropBelowBase()
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
+        string source = await CreateSourceAsync(project);
+        ReleaseCatalog catalog = new(project.Context, project.Signer);
+        CandidatePreparer preparer = new(project.Context, catalog);
+        ReleaseBuilder builder = new(project.Context, project.Signer);
+        await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "base",
+            fullClient: true, minimumLauncherVersion: "2.0.0");
+        var (before, _) = await builder.BuildAsync("2026.09.26.1");
+        var error = await Assert.ThrowsAsync<PatchPublisherException>(() => preparer.PrepareAsync(
+            "2026.09.26.2", 2, source, NoReplacements, "lower minimum", baseReleaseId: "2026.09.26.1",
+            fullClient: true, minimumLauncherVersion: "1.1.1"));
+        Assert.Contains("基準版本要求的 2.0.0", error.Message);
+        string candidate = await preparer.PrepareAsync("2026.09.26.2", 2, source, NoReplacements, "raise minimum",
+            baseReleaseId: "2026.09.26.1", fullClient: true, minimumLauncherVersion: "2.1.0");
+        string path = Path.Combine(candidate, "release-info.json");
+        var info = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(path))!;
+        info["minimumLauncherVersion"] = "1.1.1";
+        await File.WriteAllTextAsync(path, info.ToJsonString());
+        error = await Assert.ThrowsAsync<PatchPublisherException>(() => builder.BuildAsync("2026.09.26.2"));
+        Assert.Contains("基準版本要求的 2.0.0", error.Message);
+        info["minimumLauncherVersion"] = "2.1.0";
+        await File.WriteAllTextAsync(path, info.ToJsonString());
+        var (after, report) = await builder.BuildAsync("2026.09.26.2");
+        Assert.Equal("2.1.0", after.MinimumLauncherVersion);
+        Assert.Equal(before.Files.Select(file => file.Sha256), after.Files.Select(file => file.Sha256));
+        Assert.Equal(0, report.NewLocalChunkCount);
+    }
+
     [Theory]
     [InlineData(null, false)]
     [InlineData("1.0.0", false)]
