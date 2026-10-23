@@ -39,6 +39,7 @@ public sealed class ReleaseInfo
     public required string GameVersion { get; init; }
     public string? SourceDirectory { get; init; }
     public string MinimumLauncherVersion { get; init; } = "1.0.0";
+    public int LauncherTicketProtocol { get; init; } = 1;
     public required DateTimeOffset CreatedAt { get; init; }
     public string? BaseReleaseId { get; init; }
     public List<ReleaseChange> Changes { get; init; } = [];
@@ -80,6 +81,7 @@ public sealed class ReleaseManifest
     public required long ContentVersion { get; init; }
     public required string GameVersion { get; init; }
     public required string MinimumLauncherVersion { get; init; }
+    public int LauncherTicketProtocol { get; init; } = 1;
     public required DateTimeOffset CreatedAt { get; init; }
     public required List<ManifestFile> Files { get; init; }
     public List<string> Delete { get; init; } = [];

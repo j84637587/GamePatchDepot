@@ -105,6 +105,8 @@ public sealed class ReleaseCatalog(ProjectContext context, SigningService signer
             throw new PatchPublisherException("Manifest 產品或遊戲版本不符合目前設定。");
         }
 
+        if (manifest.LauncherTicketProtocol is not (1 or 2))
+            throw new PatchPublisherException("不支援的 launcherTicketProtocol（僅支援 1 或 2）。");
         PathPolicy.ValidateFileSet(manifest.Files.Select(file => file.Path));
         if (manifest.SchemaVersion == 2 && !manifest.Files.Any(file => file.Path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)))
             throw new PatchPublisherException("完整客戶端 Manifest 缺少 EXE。");

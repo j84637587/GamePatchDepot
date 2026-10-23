@@ -264,6 +264,7 @@ public sealed class RollbackBuilder(ProjectContext context, SigningService signe
             ContentVersion = newContentVersion,
             GameVersion = target.GameVersion,
             MinimumLauncherVersion = target.MinimumLauncherVersion,
+            LauncherTicketProtocol = target.LauncherTicketProtocol,
             CreatedAt = DateTimeOffset.UtcNow,
             Files = target.Files,
             Delete = target.Delete

@@ -2,6 +2,31 @@ namespace GamePatchDepot.Tests;
 
 public sealed class ReleaseBuilderTests
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task Build_PreservesAndValidatesSignedTicketProtocol(int protocol)
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
+        string candidate = await project.CreateCandidateAsync("2026.09.23.1", 1008,
+            new Dictionary<string, byte[]> { ["UI.nx"] = [1, 2, 3] });
+        string infoPath = Path.Combine(candidate, "release-info.json");
+        var info = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(infoPath))!;
+        info["launcherTicketProtocol"] = protocol;
+        await File.WriteAllTextAsync(infoPath, info.ToJsonString());
+        ReleaseBuilder builder = new(project.Context, project.Signer);
+        if (protocol == 3)
+        {
+            await Assert.ThrowsAsync<PatchPublisherException>(() => builder.BuildAsync("2026.09.23.1"));
+            return;
+        }
+        (ReleaseManifest manifest, _) = await builder.BuildAsync("2026.09.23.1");
+        Assert.Equal(protocol, manifest.LauncherTicketProtocol);
+        var verified = await new ReleaseCatalog(project.Context, project.Signer).LoadVerifiedAsync("2026.09.23.1");
+        Assert.Equal(protocol, verified.Manifest.LauncherTicketProtocol);
+    }
+
     [Fact]
     public async Task Build_SplitsLargeFileAndCanVerifyLocally()
     {

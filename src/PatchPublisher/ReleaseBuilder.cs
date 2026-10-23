@@ -141,6 +141,7 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
             ContentVersion = releaseInfo.ContentVersion,
             GameVersion = releaseInfo.GameVersion,
             MinimumLauncherVersion = releaseInfo.MinimumLauncherVersion,
+            LauncherTicketProtocol = releaseInfo.LauncherTicketProtocol,
             CreatedAt = releaseInfo.CreatedAt,
             Files = orderedManifestFiles,
             Delete = deletePaths
@@ -409,6 +410,8 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
             PatchJsonContext.Default.ReleaseInfo,
             cancellationToken) ?? throw new PatchPublisherException("release-info.json 格式錯誤。");
 
+        if (releaseInfo.LauncherTicketProtocol is not (1 or 2))
+            throw new PatchPublisherException("不支援的 launcherTicketProtocol（僅支援 1 或 2）。");
         if (releaseInfo.SchemaVersion is not (1 or 2))
             throw new PatchPublisherException("不支援的 Candidate Schema。");
 
