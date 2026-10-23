@@ -106,6 +106,7 @@ Upload 後按「R2 深度驗證」。工具會先驗證本機與遠端 Manifest 
 只保留「遊戲準備好後才申請票證」流程，避免載入時間消耗 60 秒有效期。單開遊戲的密碼登入備案不受影響。
 
 - 先用新的正式版號發布支援新流程的 NovaLink，再準備支援 `--novalink-ticket-ready-stdin` 的新版 NovaStory。
+- 首次發布或從舊協定遷移必須用完整客戶端（CLI 加 `--full-client`），包含新版遊戲 EXE；只更新 NX 不能完成遷移。
 - Prepare 固定產生 `launcherTicketProtocol: 2`；Build 前只需將 Candidate 的 `minimumLauncherVersion` 填為該 NovaLink 實際發版版本，不要保留預設 `1.0.0` 或不支援的舊版號。
 - 依原流程 Build、驗證及發布 Test，遊玩確認後才發布 Stable。不可只把舊 EXE 的協定欄位改成 2；請先確認 EXE 已包含新交接實作。
 
