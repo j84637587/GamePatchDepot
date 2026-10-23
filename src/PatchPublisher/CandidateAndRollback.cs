@@ -15,7 +15,8 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
         string? baseReleaseId = null,
         bool fullClient = false,
         PrepareSelection? selection = null,
-        int? launcherTicketProtocol = null)
+        int? launcherTicketProtocol = null,
+        string? minimumLauncherVersion = null)
     {
         if (launcherTicketProtocol is not null and not 2)
             throw new PatchPublisherException("舊票證協定已移除，僅支援 launcherTicketProtocol 2。");
@@ -69,6 +70,9 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 throw new PatchPublisherException("完整客戶端版本必須使用 --full-client 準備後續更新。");
             if (!fullClient && baseManifest?.LauncherTicketProtocol != 2)
                 throw new PatchPublisherException("首次發布或從舊票證協定遷移必須使用 --full-client，包含支援新交接的遊戲 EXE；不能只更新 NX。");
+            string? selectedMinimum = minimumLauncherVersion ??
+                (baseManifest?.LauncherTicketProtocol == 2 ? baseManifest.MinimumLauncherVersion : null);
+            LauncherTicketPolicy.ValidateMinimumVersion(selectedMinimum);
 
             ClientFilePolicy policy = fullClient ? ClientFilePolicy.Load(context.ProjectRoot) : new();
             List<string> sourceFiles = fullClient ? ClientFilePolicy.EnumerateFiles(sourceRoot) : context.AllowedFiles.ToList();
@@ -156,7 +160,7 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
                 ReleaseId = releaseId,
                 ContentVersion = contentVersion,
                 GameVersion = context.Config.GameVersion,
-                MinimumLauncherVersion = baseManifest?.MinimumLauncherVersion ?? "1.0.0",
+                MinimumLauncherVersion = selectedMinimum!,
                 LauncherTicketProtocol = selectedProtocol,
                 SourceDirectory = sourceRoot,
                 CreatedAt = DateTimeOffset.UtcNow,
@@ -260,6 +264,7 @@ public sealed class RollbackBuilder(ProjectContext context, SigningService signe
         (ReleaseManifest target, _, _) = await catalog.LoadVerifiedAsync(targetReleaseId, cancellationToken);
         if (target.LauncherTicketProtocol != 2)
             throw new PatchPublisherException("此回滾目標使用已移除的舊票證協定，請選擇支援新交接的版本。");
+        LauncherTicketPolicy.ValidateMinimumVersion(target.MinimumLauncherVersion);
         if (newContentVersion <= target.ContentVersion)
         {
             throw new PatchPublisherException("回滾版本的 contentVersion 仍必須高於目標內容版本。");

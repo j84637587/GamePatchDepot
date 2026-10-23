@@ -412,6 +412,7 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
 
         if (releaseInfo.LauncherTicketProtocol != 2)
             throw new PatchPublisherException("舊票證協定已移除，請使用支援新交接的 NovaStory 重新 Prepare（launcherTicketProtocol 必須是 2）。");
+        LauncherTicketPolicy.ValidateMinimumVersion(releaseInfo.MinimumLauncherVersion);
         if (releaseInfo.SchemaVersion is not (1 or 2))
             throw new PatchPublisherException("不支援的 Candidate Schema。");
 

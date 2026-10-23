@@ -174,7 +174,7 @@ public static class Program
                 null => null,
                 "2" => 2,
                 _ => throw new PatchPublisherException("舊票證協定已移除，--launcher-ticket-protocol 僅支援 2。")
-            });
+            }, options.Get("minimum-launcher-version"));
         Console.WriteLine($"Candidate 已建立：{path}");
         ReleaseInfo info = System.Text.Json.JsonSerializer.Deserialize(await File.ReadAllBytesAsync(Path.Combine(path, "release-info.json"), cancellationToken),
             PatchJsonContext.Default.ReleaseInfo)!;
@@ -489,6 +489,7 @@ Game Patch Depot - PatchPublisher
   keygen --private <path> [--public <path>]
   preview --source <dir> --output <selection.json> [--base <release-id>] [--replace UI.nx=<path>]
   prepare --release <id> --content-version <n> --source <dir>
+          [--minimum-launcher-version <x.y.z>]
           [--full-client] [--selection <selection.json>] [--base <release-id>] [--replace UI.nx=<path>] [--description <text>]
           [--launcher-ticket-protocol 2]
   build --release <id>

@@ -107,7 +107,7 @@ Upload 後按「R2 深度驗證」。工具會先驗證本機與遠端 Manifest 
 
 - 先用新的正式版號發布支援新流程的 NovaLink，再準備支援 `--novalink-ticket-ready-stdin` 的新版 NovaStory。
 - 首次發布或從舊協定遷移必須用完整客戶端（CLI 加 `--full-client`），包含新版遊戲 EXE；只更新 NX 不能完成遷移。
-- Prepare 固定產生 `launcherTicketProtocol: 2`；Build 前只需將 Candidate 的 `minimumLauncherVersion` 填為該 NovaLink 實際發版版本，不要保留預設 `1.0.0` 或不支援的舊版號。
+- Prepare 固定產生 `launcherTicketProtocol: 2`。首次發布／遷移時，在畫面的「最低 NovaLink 版本」填已發布、支援新流程的實際版本（必須高於不支援的 `1.1.0`）；CLI 用 `--minimum-launcher-version <實際版本>`，不用手改 JSON。後續留空可沿用相容基準。
 - 依原流程 Build、驗證及發布 Test，遊玩確認後才發布 Stable。不可只把舊 EXE 的協定欄位改成 2；請先確認 EXE 已包含新交接實作。
 
-舊 Candidate（協定 1 或未填）不再允許 Build；歷史 Manifest 可供驗證與比較，但不可重新發布頻道或作為回滾目標。舊版基準可用於準備新版，Prepare 會升為協定 2；後續沿用最低 NovaLink 版本，協定固定為 2，不提供降回舊模式的選項。新舊兩端需要搭配發布，既有安裝不會因程式碼合併就自動升級。
+舊 Candidate（協定 1 或未填）不再允許 Build；歷史 Manifest 可供驗證與比較，但不可重新發布頻道或作為回滾目標。Prepare、Build、發布與回滾均會阻擋不相容的最低 NovaLink 版本；工具無法代替維運確認填寫版本確實已發布且包含新交接。協定固定為 2，不提供降回舊模式的選項。新舊兩端需要搭配發布，既有安裝不會因程式碼合併就自動升級。

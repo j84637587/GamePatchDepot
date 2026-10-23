@@ -22,7 +22,7 @@ public sealed class CandidateAndRollbackTests
             source,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["UI.nx"] = replacement },
             "更新 UI",
-            CancellationToken.None, fullClient: true);
+            CancellationToken.None, fullClient: true, minimumLauncherVersion: "1.1.1");
 
         Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(Path.Combine(candidate, "files", "A.nx")));
         Assert.Equal(new byte[] { 9, 9, 9 }, await File.ReadAllBytesAsync(Path.Combine(candidate, "files", "UI.nx")));

@@ -19,7 +19,7 @@ public sealed class FullClientTests
         ReleaseCatalog catalog = new(project.Context, project.Signer);
         CandidatePreparer preparer = new(project.Context, catalog);
         ReleaseBuilder builder = new(project.Context, project.Signer);
-        await preparer.PrepareAsync("2026.09.26.1", 1, source, new Dictionary<string, string>(), "first", fullClient: true);
+        await preparer.PrepareAsync("2026.09.26.1", 1, source, new Dictionary<string, string>(), "first", fullClient: true, minimumLauncherVersion: "1.1.1");
         (ReleaseManifest first, _) = await builder.BuildAsync("2026.09.26.1");
         Assert.Equal(2, first.SchemaVersion);
         Assert.Equal(5, first.Files.Count);
@@ -38,7 +38,7 @@ public sealed class FullClientTests
         await File.WriteAllBytesAsync(Path.Combine(source, "data", "client.dll"), [7, 8, 9]);
         File.Delete(Path.Combine(source, "data", "empty.dat"));
         string candidate = await preparer.PrepareAsync("2026.09.26.2", 2, source, new Dictionary<string, string>(), "delta",
-            baseReleaseId: first.ReleaseId, fullClient: true);
+            baseReleaseId: first.ReleaseId, fullClient: true, minimumLauncherVersion: "1.1.1");
         Assert.Single(Directory.EnumerateFiles(Path.Combine(candidate, "files"), "*", SearchOption.AllDirectories));
         (ReleaseManifest second, _) = await builder.BuildAsync("2026.09.26.2");
         Assert.Equal(4, second.Files.Count);
@@ -68,7 +68,7 @@ public sealed class FullClientTests
         // 只有刪除的更新仍可建立，不需要任何新 payload。
         File.Delete(Path.Combine(source, "data", "UI.nx"));
         await preparer.PrepareAsync("2026.09.26.3", 3, source, new Dictionary<string, string>(), "remove",
-            baseReleaseId: second.ReleaseId, fullClient: true);
+            baseReleaseId: second.ReleaseId, fullClient: true, minimumLauncherVersion: "1.1.1");
         (ReleaseManifest third, BuildReport report) = await builder.BuildAsync("2026.09.26.3");
         Assert.Equal(0, report.NewLocalChunkCount);
         Assert.DoesNotContain(third.Files, file => file.Path == "data/UI.nx");
@@ -91,12 +91,12 @@ public sealed class FullClientTests
         ReleaseCatalog catalog = new(project.Context, project.Signer);
         CandidatePreparer preparer = new(project.Context, catalog);
         ReleaseBuilder builder = new(project.Context, project.Signer);
-        await preparer.PrepareAsync("2026.09.26.1", 1, source, new Dictionary<string, string>(), "first", fullClient: true);
+        await preparer.PrepareAsync("2026.09.26.1", 1, source, new Dictionary<string, string>(), "first", fullClient: true, minimumLauncherVersion: "1.1.1");
         await builder.BuildAsync("2026.09.26.1");
         await File.WriteAllTextAsync(Path.Combine(project.Root, "config", "client-files.json"),
             """{"preservedPaths":["settings.ini"],"requiredFiles":["Game.exe"]}""");
         await preparer.PrepareAsync("2026.09.26.2", 2, source, new Dictionary<string, string>(), "preserve",
-            baseReleaseId: "2026.09.26.1", fullClient: true);
+            baseReleaseId: "2026.09.26.1", fullClient: true, minimumLauncherVersion: "1.1.1");
         (ReleaseManifest next, _) = await builder.BuildAsync("2026.09.26.2");
         Assert.Contains("settings.ini", next.Preserve!);
         Assert.Empty(next.Delete);
@@ -105,7 +105,7 @@ public sealed class FullClientTests
         await File.WriteAllTextAsync(Path.Combine(project.Root, "config", "client-files.json"),
             """{"requiredFiles":["missing.dll"]}""");
         await Assert.ThrowsAsync<PatchPublisherException>(() => preparer.PrepareAsync("2026.09.26.3", 3, source,
-            new Dictionary<string, string>(), "missing", fullClient: true));
+            new Dictionary<string, string>(), "missing", fullClient: true, minimumLauncherVersion: "1.1.1"));
     }
 
     [Fact]
@@ -117,11 +117,11 @@ public sealed class FullClientTests
         await File.WriteAllBytesAsync(Path.Combine(source, "UI.nx"), [1]);
         CandidatePreparer preparer = new(project.Context, new ReleaseCatalog(project.Context, project.Signer));
         await Assert.ThrowsAsync<PatchPublisherException>(() => preparer.PrepareAsync("2026.09.26.1", 1, source,
-            new Dictionary<string, string>(), "invalid", fullClient: true));
+            new Dictionary<string, string>(), "invalid", fullClient: true, minimumLauncherVersion: "1.1.1"));
         Assert.False(Directory.Exists(project.Context.CandidatePath("2026.09.26.1")));
         await File.WriteAllBytesAsync(Path.Combine(source, "Game.exe"), [2]);
         string candidate = await preparer.PrepareAsync("2026.09.26.1", 1, source,
-            new Dictionary<string, string>(), "valid", fullClient: true);
+            new Dictionary<string, string>(), "valid", fullClient: true, minimumLauncherVersion: "1.1.1");
         await File.WriteAllBytesAsync(Path.Combine(candidate, "files", "undeclared.dll"), [3]);
         await Assert.ThrowsAsync<PatchPublisherException>(() => new ReleaseBuilder(project.Context, project.Signer).BuildAsync("2026.09.26.1"));
     }
@@ -139,7 +139,7 @@ public sealed class FullClientTests
         await File.WriteAllBytesAsync(Path.Combine(source, "Game.exe"), [2]);
         CandidatePreparer preparer = new(project.Context, new ReleaseCatalog(project.Context, project.Signer));
         string candidate = await preparer.PrepareAsync("2026.09.26.2", 2, source,
-            new Dictionary<string, string>(), "upgrade", baseReleaseId: "2026.09.26.1", fullClient: true);
+            new Dictionary<string, string>(), "upgrade", baseReleaseId: "2026.09.26.1", fullClient: true, minimumLauncherVersion: "1.1.1");
         Assert.False(File.Exists(Path.Combine(candidate, "files", "UI.nx")));
         Assert.Equal(2, (await builder.BuildAsync("2026.09.26.2")).Manifest.Files.Count);
     }
@@ -165,11 +165,11 @@ public sealed class FullClientTests
         await File.WriteAllBytesAsync(Path.Combine(source, "data", "client.dll"), [2]);
         ReleaseCatalog catalog = new(project.Context, project.Signer);
         CandidatePreparer preparer = new(project.Context, catalog);
-        string candidate = await preparer.PrepareAsync("2026.09.26.1", 1, source, new Dictionary<string, string>(), "test", fullClient: true);
+        string candidate = await preparer.PrepareAsync("2026.09.26.1", 1, source, new Dictionary<string, string>(), "test", fullClient: true, minimumLauncherVersion: "1.1.1");
         await new ReleaseCancellationService(project.Context, catalog).DiscardCandidateAsync("2026.09.26.1");
         Assert.False(Directory.Exists(candidate));
         Assert.True(File.Exists(Path.Combine(source, "data", "client.dll")));
-        await preparer.PrepareAsync("2026.09.26.1", 1, source, new Dictionary<string, string>(), "retry", fullClient: true);
+        await preparer.PrepareAsync("2026.09.26.1", 1, source, new Dictionary<string, string>(), "retry", fullClient: true, minimumLauncherVersion: "1.1.1");
         await new ReleaseBuilder(project.Context, project.Signer).BuildAsync("2026.09.26.1");
     }
 

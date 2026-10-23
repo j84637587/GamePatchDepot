@@ -74,6 +74,7 @@ internal sealed class TestProject : IAsyncDisposable
         ReleaseInfo info = new()
         {
             LauncherTicketProtocol = 2,
+            MinimumLauncherVersion = "1.1.1",
             ReleaseId = releaseId,
             ContentVersion = contentVersion,
             GameVersion = "TEST",

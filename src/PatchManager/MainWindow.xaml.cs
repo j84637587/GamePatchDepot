@@ -216,6 +216,11 @@ public partial class MainWindow : Window
             "--source", SourceTextBox.Text.Trim(),
             "--description", DescriptionTextBox.Text.Trim()
         ];
+        if (!string.IsNullOrWhiteSpace(MinimumLauncherVersionTextBox.Text))
+        {
+            arguments.Add("--minimum-launcher-version");
+            arguments.Add(MinimumLauncherVersionTextBox.Text.Trim());
+        }
         if (!string.IsNullOrWhiteSpace(UiReplacementTextBox.Text))
         {
             arguments.Add("--replace");
@@ -1151,7 +1156,14 @@ public partial class MainWindow : Window
             {
                 using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(path));
                 if (!document.RootElement.TryGetProperty("launcherTicketProtocol", out JsonElement protocol) ||
-                    !protocol.TryGetInt32(out int protocolVersion) || protocolVersion != 2)
+                    protocol.ValueKind != JsonValueKind.Number || !protocol.TryGetInt32(out int protocolVersion) || protocolVersion != 2)
+                {
+                    continue;
+                }
+                if (!document.RootElement.TryGetProperty("minimumLauncherVersion", out JsonElement minimum) ||
+                    minimum.ValueKind != JsonValueKind.String || minimum.GetString() is not string minimumText ||
+                    minimumText.Split('.').Length != 3 || !Version.TryParse(minimumText, out Version? minimumVersion) ||
+                    minimumVersion <= new Version(1, 1, 0))
                 {
                     continue;
                 }

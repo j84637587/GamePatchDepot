@@ -168,6 +168,13 @@
                         </StackPanel>
                     </GroupBox>
 
+                    <GroupBox Header="最低 NovaLink 版本">
+                        <StackPanel>
+                            <TextBlock Text="填已發布且支援新登入流程的實際版本，須高於 1.1.0。後續留空可沿用相容基準。" TextWrapping="Wrap" />
+                            <TextBox x:Name="MinimumLauncherVersionTextBox" ToolTip="請填 x.y.z；首次發布或從舊協定遷移必填。" />
+                        </StackPanel>
+                    </GroupBox>
+
                     <GroupBox Header="檔案來源" Style="{StaticResource SourceCardStyle}">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">

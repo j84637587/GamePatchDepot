@@ -20,6 +20,7 @@ public sealed class ActualNxSmokeTests
         ReleaseInfo info = new()
         {
             LauncherTicketProtocol = 2,
+            MinimumLauncherVersion = "1.1.1",
             ReleaseId = "2026.09.23.1",
             ContentVersion = 1008,
             GameVersion = "TEST",

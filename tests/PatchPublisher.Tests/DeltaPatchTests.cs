@@ -74,17 +74,17 @@ public sealed class DeltaPatchTests
         ReleaseCatalog catalog = new(project.Context, project.Signer);
         CandidatePreparer preparer = new(project.Context, catalog);
         ReleaseBuilder builder = new(project.Context, project.Signer);
-        await preparer.PrepareAsync("2026.09.27.1", 1, source, new Dictionary<string, string>(), "first", fullClient: true);
+        await preparer.PrepareAsync("2026.09.27.1", 1, source, new Dictionary<string, string>(), "first", fullClient: true, minimumLauncherVersion: "1.1.1");
         await builder.BuildAsync("2026.09.27.1");
         await File.WriteAllBytesAsync(Path.Combine(source, "UI.nx"), [5, .. old]);
         await File.WriteAllBytesAsync(Path.Combine(source, "new.dll"), [4]);
-        await preparer.PrepareAsync("2026.09.27.2", 2, source, new Dictionary<string, string>(), "second", baseReleaseId: "2026.09.27.1", fullClient: true);
+        await preparer.PrepareAsync("2026.09.27.2", 2, source, new Dictionary<string, string>(), "second", baseReleaseId: "2026.09.27.1", fullClient: true, minimumLauncherVersion: "1.1.1");
         (ReleaseManifest second, _) = await builder.BuildAsync("2026.09.27.2");
         Assert.NotNull(second.Files.Single(file => file.Path == "UI.nx").Patch);
         Assert.Null(second.Files.Single(file => file.Path == "Game.exe").Patch);
         Assert.Null(second.Files.Single(file => file.Path == "new.dll").Patch);
         await File.WriteAllBytesAsync(Path.Combine(source, "new.dll"), [9]);
-        await preparer.PrepareAsync("2026.09.27.3", 3, source, new Dictionary<string, string>(), "third", baseReleaseId: "2026.09.27.2", fullClient: true);
+        await preparer.PrepareAsync("2026.09.27.3", 3, source, new Dictionary<string, string>(), "third", baseReleaseId: "2026.09.27.2", fullClient: true, minimumLauncherVersion: "1.1.1");
         (ReleaseManifest third, _) = await builder.BuildAsync("2026.09.27.3");
         Assert.Null(third.Files.Single(file => file.Path == "UI.nx").Patch);
     }

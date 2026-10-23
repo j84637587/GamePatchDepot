@@ -6,6 +6,43 @@ public sealed class PrepareSelectionTests
 {
     private static readonly Dictionary<string, string> NoReplacements = new();
 
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("1.0.0", false)]
+    [InlineData("1.1.0", false)]
+    [InlineData("invalid", false)]
+    [InlineData(null, true)]
+    [InlineData("1.1.0", true)]
+    public async Task TransitionRequiresCompatibleMinimumVersion(string? minimum, bool legacyBase)
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
+        string source = await CreateSourceAsync(project);
+        ReleaseCatalog catalog = new(project.Context, project.Signer);
+        ReleaseBuilder builder = new(project.Context, project.Signer);
+        if (legacyBase)
+        {
+            await new CandidatePreparer(project.Context, catalog).PrepareAsync("2026.09.26.1", 1,
+                source, NoReplacements, "base", fullClient: true, minimumLauncherVersion: "1.1.1");
+            await builder.BuildAsync("2026.09.26.1");
+            await project.MarkAsLegacyProtocolAsync("2026.09.26.1");
+        }
+        var error = await Assert.ThrowsAsync<PatchPublisherException>(() =>
+            new CandidatePreparer(project.Context, catalog).PrepareAsync("2026.09.26.2", 2,
+                source, NoReplacements, "transition", baseReleaseId: legacyBase ? "2026.09.26.1" : null,
+                fullClient: true, minimumLauncherVersion: minimum));
+        Assert.Contains("最低 NovaLink", error.Message);
+        Assert.False(Directory.Exists(project.Context.CandidatePath("2026.09.26.2")));
+        // Editing Candidate JSON must not bypass the same rule at Build.
+        string candidate = await project.CreateCandidateAsync("2026.09.26.2", 2,
+            new Dictionary<string, byte[]> { ["UI.nx"] = [1] });
+        string infoPath = Path.Combine(candidate, "release-info.json");
+        var info = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(infoPath))!.AsObject();
+        if (minimum is null) info.Remove("minimumLauncherVersion");
+        else info["minimumLauncherVersion"] = minimum;
+        await File.WriteAllTextAsync(infoPath, info.ToJsonString());
+        await Assert.ThrowsAsync<PatchPublisherException>(() => builder.BuildAsync("2026.09.26.2"));
+    }
+
     [Fact]
     public async Task CliCanMigrateLegacyMetadataWithoutChangingFiles()
     {
@@ -13,13 +50,13 @@ public sealed class PrepareSelectionTests
         string source = await CreateSourceAsync(project);
         ReleaseCatalog catalog = new(project.Context, project.Signer);
         CandidatePreparer preparer = new(project.Context, catalog);
-        await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true,
+        await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true, minimumLauncherVersion: "1.1.1",
             launcherTicketProtocol: 2);
         ReleaseBuilder builder = new(project.Context, project.Signer);
         var (before, _) = await builder.BuildAsync("2026.09.26.1");
         await project.MarkAsLegacyProtocolAsync("2026.09.26.1");
         string config = Path.Combine(project.Root, "config", "product.json");
-        Assert.Equal(0, await Program.Main(["prepare", "--config", config, "--full-client",
+        Assert.Equal(0, await Program.Main(["prepare", "--minimum-launcher-version", "1.1.1", "--config", config, "--full-client",
             "--release", "2026.09.26.2", "--content-version", "2", "--source", source,
             "--base", "2026.09.26.1", "--launcher-ticket-protocol", "2"]));
         var info = JsonSerializer.Deserialize<ReleaseInfo>(
@@ -33,7 +70,7 @@ public sealed class PrepareSelectionTests
         // An explicitly unchanged protocol must not bypass the no-change check.
         await Assert.ThrowsAsync<PatchPublisherException>(() => preparer.PrepareAsync(
             "2026.09.26.3", 3, source, NoReplacements, "no change", baseReleaseId: "2026.09.26.2",
-            fullClient: true, launcherTicketProtocol: 2));
+            fullClient: true, minimumLauncherVersion: "1.1.1", launcherTicketProtocol: 2));
     }
 
     [Fact]
@@ -44,11 +81,11 @@ public sealed class PrepareSelectionTests
         ReleaseCatalog catalog = new(project.Context, project.Signer);
         CandidatePreparer preparer = new(project.Context, catalog);
         ReleaseBuilder builder = new(project.Context, project.Signer);
-        string first = await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true);
+        string first = await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true, minimumLauncherVersion: "1.1.1");
         string firstInfo = Path.Combine(first, "release-info.json");
         var info = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(firstInfo))!;
         info["launcherTicketProtocol"] = 2;
-        info["minimumLauncherVersion"] = "1.1.0";
+        info["minimumLauncherVersion"] = "1.1.1";
         await File.WriteAllTextAsync(firstInfo, info.ToJsonString());
         await builder.BuildAsync("2026.09.26.1");
         await File.AppendAllTextAsync(Path.Combine(source, "Game.exe"), "changed");
@@ -57,7 +94,7 @@ public sealed class PrepareSelectionTests
         string nextInfo = Path.Combine(next, "release-info.json");
         info = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(nextInfo))!;
         Assert.Equal(2, info["launcherTicketProtocol"]!.GetValue<int>());
-        Assert.Equal("1.1.0", info["minimumLauncherVersion"]!.GetValue<string>());
+        Assert.Equal("1.1.1", info["minimumLauncherVersion"]!.GetValue<string>());
         info["launcherTicketProtocol"] = 1;
         await File.WriteAllTextAsync(nextInfo, info.ToJsonString());
         await Assert.ThrowsAsync<PatchPublisherException>(() => builder.BuildAsync("2026.09.26.2"));
@@ -65,10 +102,10 @@ public sealed class PrepareSelectionTests
         await File.WriteAllTextAsync(nextInfo, info.ToJsonString());
         var (manifest, _) = await builder.BuildAsync("2026.09.26.2");
         Assert.Equal(2, manifest.LauncherTicketProtocol);
-        Assert.Equal("1.1.0", manifest.MinimumLauncherVersion);
+        Assert.Equal("1.1.1", manifest.MinimumLauncherVersion);
         await Assert.ThrowsAsync<PatchPublisherException>(() => preparer.PrepareAsync(
             "2026.09.26.3", 3, source, NoReplacements, "downgrade", baseReleaseId: "2026.09.26.2",
-            fullClient: true, launcherTicketProtocol: 1));
+            fullClient: true, minimumLauncherVersion: "1.1.1", launcherTicketProtocol: 1));
     }
 
     [Fact]
@@ -82,7 +119,7 @@ public sealed class PrepareSelectionTests
         PrepareSelection selection = JsonSerializer.Deserialize<PrepareSelection>(await File.ReadAllBytesAsync(output), PrepareSelection.JsonOptions)!;
         selection.Files.Single(file => file.Path == "settings.ini").Include = false;
         await File.WriteAllBytesAsync(output, JsonSerializer.SerializeToUtf8Bytes(selection, PrepareSelection.JsonOptions));
-        Assert.Equal(0, await Program.Main(["prepare", "--config", config, "--full-client", "--release", "2026.09.26.1",
+        Assert.Equal(0, await Program.Main(["prepare", "--minimum-launcher-version", "1.1.1", "--config", config, "--full-client", "--release", "2026.09.26.1",
             "--content-version", "1", "--source", source, "--selection", output]));
         string candidate = project.Context.CandidatePath("2026.09.26.1");
         Assert.True(File.Exists(Path.Combine(candidate, "files", "Game.exe")));
@@ -104,7 +141,7 @@ public sealed class PrepareSelectionTests
         selection = JsonSerializer.Deserialize<PrepareSelection>(
             JsonSerializer.Serialize(selection, PrepareSelection.JsonOptions), PrepareSelection.JsonOptions)!;
         string candidate = await new CandidatePreparer(project.Context, catalog).PrepareAsync(
-            "2026.09.26.1", 1, source, NoReplacements, "selected", fullClient: true, selection: selection);
+            "2026.09.26.1", 1, source, NoReplacements, "selected", fullClient: true, minimumLauncherVersion: "1.1.1", selection: selection);
         Assert.False(File.Exists(Path.Combine(candidate, "files", "settings.ini")));
         (ReleaseManifest manifest, _) = await new ReleaseBuilder(project.Context, project.Signer).BuildAsync("2026.09.26.1");
         Assert.Equal(["Game.exe", "optional.dll"], manifest.Files.Select(file => file.Path).Order());
@@ -123,7 +160,7 @@ public sealed class PrepareSelectionTests
         ReleaseCatalog catalog = new(project.Context, project.Signer);
         CandidatePreparer preparer = new(project.Context, catalog);
         ReleaseBuilder builder = new(project.Context, project.Signer);
-        await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true);
+        await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true, minimumLauncherVersion: "1.1.1");
         await builder.BuildAsync("2026.09.26.1");
         PrepareSelectionService service = new(project.Context, catalog);
         PrepareSelection selection = await service.ScanAsync(source, "2026.09.26.1", NoReplacements);
@@ -131,7 +168,7 @@ public sealed class PrepareSelectionTests
         setting.Include = false;
         setting.Remove = remove;
         await preparer.PrepareAsync("2026.09.26.2", 2, source, NoReplacements, "choose", baseReleaseId: "2026.09.26.1",
-            fullClient: true, selection: selection);
+            fullClient: true, minimumLauncherVersion: "1.1.1", selection: selection);
         (ReleaseManifest manifest, BuildReport report) = await builder.BuildAsync("2026.09.26.2");
         Assert.Equal(0, report.NewLocalChunkCount);
         Assert.DoesNotContain(manifest.Files, file => file.Path == "settings.ini");
@@ -153,7 +190,7 @@ public sealed class PrepareSelectionTests
         ReleaseCatalog catalog = new(project.Context, project.Signer);
         CandidatePreparer preparer = new(project.Context, catalog);
         ReleaseBuilder builder = new(project.Context, project.Signer);
-        await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true);
+        await preparer.PrepareAsync("2026.09.26.1", 1, source, NoReplacements, "first", fullClient: true, minimumLauncherVersion: "1.1.1");
         await builder.BuildAsync("2026.09.26.1");
         File.Delete(Path.Combine(source, "optional.dll"));
         PrepareSelection selection = await new PrepareSelectionService(project.Context, catalog).ScanAsync(source, "2026.09.26.1", NoReplacements);
@@ -162,7 +199,7 @@ public sealed class PrepareSelectionTests
         Assert.False(missing.Remove);
         Assert.True(missing.CanRemove);
         await preparer.PrepareAsync("2026.09.26.2", 2, source, NoReplacements, "missing", baseReleaseId: "2026.09.26.1",
-            fullClient: true, selection: selection);
+            fullClient: true, minimumLauncherVersion: "1.1.1", selection: selection);
         (ReleaseManifest manifest, _) = await builder.BuildAsync("2026.09.26.2");
         Assert.Empty(manifest.Delete);
         Assert.Contains("optional.dll", manifest.Preserve!);
@@ -187,7 +224,7 @@ public sealed class PrepareSelectionTests
             case "policy": await File.WriteAllTextAsync(Path.Combine(project.Root, "config", "client-files.json"), """{"requiredFiles":["Game.exe"]}"""); break;
         }
         await Assert.ThrowsAsync<PatchPublisherException>(() => new CandidatePreparer(project.Context, catalog).PrepareAsync(
-            "2026.09.26.1", 1, source, NoReplacements, "drift", fullClient: true, selection: selection));
+            "2026.09.26.1", 1, source, NoReplacements, "drift", fullClient: true, minimumLauncherVersion: "1.1.1", selection: selection));
         Assert.False(Directory.Exists(project.Context.CandidatePath("2026.09.26.1")));
     }
 
@@ -204,7 +241,7 @@ public sealed class PrepareSelectionTests
         PrepareSelection selection = await new PrepareSelectionService(project.Context, catalog).ScanAsync(source, null, NoReplacements);
         selection.Files.Single(file => file.Path == path).Include = include;
         await Assert.ThrowsAsync<PatchPublisherException>(() => new CandidatePreparer(project.Context, catalog).PrepareAsync(
-            "2026.09.26.1", 1, source, NoReplacements, "invalid", fullClient: true, selection: selection));
+            "2026.09.26.1", 1, source, NoReplacements, "invalid", fullClient: true, minimumLauncherVersion: "1.1.1", selection: selection));
         Assert.False(Directory.Exists(project.Context.CandidatePath("2026.09.26.1")));
     }
 
