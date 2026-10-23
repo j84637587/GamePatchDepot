@@ -1146,6 +1146,8 @@ public partial class MainWindow : Window
         try
         {
             using JsonDocument config = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(_projectRoot, "config", "product.json")));
+            if (config.RootElement.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException("product.json 必須是 JSON 物件。");
             gameExecutable = config.RootElement.TryGetProperty("gameExecutable", out JsonElement executable)
                 ? executable.ValueKind == JsonValueKind.String ? executable.GetString()! : throw new InvalidDataException("gameExecutable 必須是字串。")
                 : "NovaStory.exe";
