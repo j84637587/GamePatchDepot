@@ -49,6 +49,8 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
                 releaseInfo.BaseReleaseId,
                 cancellationToken);
             LauncherTicketPolicy.ValidateAgainstBase(releaseInfo.MinimumLauncherVersion, baseManifest.MinimumLauncherVersion);
+            if (baseManifest.SchemaVersion != 2 || !baseManifest.Files.Any(file => string.Equals(file.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase)))
+                throw new PatchPublisherException("舊基準未記錄遊戲主程式，無法驗證遷移；請使用新版 EXE 建立新完整基準（不加 --base）。");
             migratingLegacyProtocol = baseManifest.LauncherTicketProtocol != 2;
             if (migratingLegacyProtocol && !fullClient)
                 throw new PatchPublisherException("舊票證協定遷移必須使用完整客戶端，不能只更新 NX。");
@@ -130,7 +132,7 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
             .ToList();
         if (migratingLegacyProtocol && !orderedManifestFiles.Any(file =>
             string.Equals(file.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase) &&
-            (!baseFiles.TryGetValue(file.Path, out ManifestFile? old) || file.Sha256 != old.Sha256)))
+            baseFiles.TryGetValue(file.Path, out ManifestFile? old) && file.Sha256 != old.Sha256))
             throw new PatchPublisherException("舊票證協定遷移必須交付已更新的遊戲 EXE，不能只修改協定欄位。");
         List<string> deletePaths = releaseInfo.Delete
             .Select(PathPolicy.NormalizeInstallPath)

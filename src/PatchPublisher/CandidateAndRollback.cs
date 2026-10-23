@@ -60,6 +60,8 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
             if (!string.IsNullOrWhiteSpace(baseReleaseId))
             {
                 (baseManifest, _, _) = await catalog.LoadVerifiedAsync(baseReleaseId, cancellationToken);
+                if (baseManifest.SchemaVersion != 2 || !baseManifest.Files.Any(file => string.Equals(file.Path, context.GameExecutable, StringComparison.OrdinalIgnoreCase)))
+                    throw new PatchPublisherException("舊基準未記錄遊戲主程式，無法驗證遷移；請使用新版 EXE 建立新完整基準（不加 --base）。");
                 if (contentVersion <= baseManifest.ContentVersion)
                 {
                     throw new PatchPublisherException(

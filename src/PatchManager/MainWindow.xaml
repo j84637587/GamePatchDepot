@@ -172,6 +172,8 @@
                         <StackPanel>
                             <TextBlock Text="填已發布且支援新登入流程的實際版本，須高於 1.1.0。後續留空可沿用相容基準。" TextWrapping="Wrap" />
                             <TextBox x:Name="MinimumLauncherVersionTextBox" ToolTip="請填 x.y.z；首次發布或從舊協定遷移必填。" />
+                            <CheckBox x:Name="NewFullClientBaselineCheckBox" Content="建立新完整基準（舊版只有 NX 時使用）" Margin="0,8,0,0"
+                                      ToolTip="來源必須是本次支援新登入流程的新版遊戲。忽略舊基準重新盤點，已存在的相同分塊仍可重用。" />
                         </StackPanel>
                     </GroupBox>
 

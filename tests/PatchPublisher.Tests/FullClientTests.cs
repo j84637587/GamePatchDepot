@@ -127,7 +127,7 @@ public sealed class FullClientTests
     }
 
     [Fact]
-    public async Task LegacyNxBaseCanBecomeFullClientWithoutCopyingUnchangedNx()
+    public async Task LegacyNxCannotBeMigrationBaseAndFreshBaselineReusesChunks()
     {
         await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
         await project.CreateCandidateAsync("2026.09.26.1", 1, new Dictionary<string, byte[]> { ["UI.nx"] = [1] });
@@ -139,10 +139,22 @@ public sealed class FullClientTests
         await File.WriteAllBytesAsync(Path.Combine(source, "UI.nx"), [1]);
         await File.WriteAllBytesAsync(Path.Combine(source, "Game.exe"), [2]);
         CandidatePreparer preparer = new(project.Context, new ReleaseCatalog(project.Context, project.Signer));
+        var error = await Assert.ThrowsAsync<PatchPublisherException>(() => preparer.PrepareAsync("2026.09.26.2", 2, source,
+            new Dictionary<string, string>(), "upgrade", baseReleaseId: "2026.09.26.1", fullClient: true, minimumLauncherVersion: "1.1.1"));
+        Assert.Contains("未記錄遊戲主程式", error.Message);
         string candidate = await preparer.PrepareAsync("2026.09.26.2", 2, source,
-            new Dictionary<string, string>(), "upgrade", baseReleaseId: "2026.09.26.1", fullClient: true, minimumLauncherVersion: "1.1.1");
-        Assert.False(File.Exists(Path.Combine(candidate, "files", "UI.nx")));
-        Assert.Equal(2, (await builder.BuildAsync("2026.09.26.2")).Manifest.Files.Count);
+            new Dictionary<string, string>(), "fresh baseline", fullClient: true, minimumLauncherVersion: "1.1.1");
+        string infoPath = Path.Combine(candidate, "release-info.json");
+        var info = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(infoPath))!;
+        info["baseReleaseId"] = "2026.09.26.1";
+        await File.WriteAllTextAsync(infoPath, info.ToJsonString());
+        error = await Assert.ThrowsAsync<PatchPublisherException>(() => builder.BuildAsync("2026.09.26.2"));
+        Assert.Contains("未記錄遊戲主程式", error.Message);
+        info["baseReleaseId"] = null;
+        await File.WriteAllTextAsync(infoPath, info.ToJsonString());
+        var (manifest, report) = await builder.BuildAsync("2026.09.26.2");
+        Assert.Equal(2, manifest.Files.Count);
+        Assert.Equal(1, report.NewLocalChunkCount); // unchanged NX reuses its existing chunk.
     }
 
     [Theory]

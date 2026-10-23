@@ -142,6 +142,7 @@ public partial class MainWindow : Window
         ReleaseIdTextBox.Text = SuggestReleaseId();
         ContentVersionTextBox.Text = (_highestContentVersion + 1).ToString(CultureInfo.InvariantCulture);
         DescriptionTextBox.Clear();
+        NewFullClientBaselineCheckBox.IsChecked = false;
         UiReplacementTextBox.Clear();
         _updatingFields = false;
         _deepVerifiedReleaseId = null;
@@ -210,6 +211,7 @@ public partial class MainWindow : Window
         }
 
         string minimumLauncherVersion = MinimumLauncherVersionTextBox.Text.Trim();
+        bool newFullClientBaseline = NewFullClientBaselineCheckBox.IsChecked == true;
         List<string> arguments =
         [
             "prepare", "--full-client", "--release", releaseId,
@@ -227,7 +229,7 @@ public partial class MainWindow : Window
             arguments.Add("--replace");
             arguments.Add($"UI.nx={UiReplacementTextBox.Text.Trim()}");
         }
-        string? baseReleaseId = GetPublishedBaseReleaseId();
+        string? baseReleaseId = newFullClientBaseline ? null : GetPublishedBaseReleaseId();
         if (baseReleaseId is not null)
         {
             string baseManifest = Path.Combine(_projectRoot, "catalog", "releases", $"{baseReleaseId}.json");
@@ -256,7 +258,8 @@ public partial class MainWindow : Window
             // 掃描期間若使用者改了欄位，不可拿舊清單建立不同來源的版本。
             if (SourceTextBox.Text.Trim() != source || UiReplacementTextBox.Text.Trim() != replacement ||
                 ReleaseIdTextBox.Text.Trim() != releaseId || ContentVersionTextBox.Text.Trim() != contentVersion ||
-                DescriptionTextBox.Text.Trim() != description || MinimumLauncherVersionTextBox.Text.Trim() != minimumLauncherVersion)
+                DescriptionTextBox.Text.Trim() != description || MinimumLauncherVersionTextBox.Text.Trim() != minimumLauncherVersion ||
+                (NewFullClientBaselineCheckBox.IsChecked == true) != newFullClientBaseline)
             {
                 AppDialog.Warning(this, "欄位已變更", "掃描期間欄位有變更，請重新按 Prepare 確認清單。");
                 return;
