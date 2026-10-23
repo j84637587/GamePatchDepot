@@ -35,6 +35,7 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
         int chunkSize = checked(context.Config.ChunkSizeMiB * 1024 * 1024);
         Dictionary<string, ManifestFile> manifestFiles = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, ManifestFile> baseFiles = new(StringComparer.OrdinalIgnoreCase);
+        bool migratingLegacyProtocol = false;
         ReleaseManifest? existingManifest = File.Exists(context.ManifestPath(releaseId))
             ? (await versionCatalog.LoadVerifiedAsync(releaseId, cancellationToken)).Manifest : null;
         int newLocalChunkCount = 0;
@@ -46,6 +47,9 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
                 releaseInfo.BaseReleaseId,
                 cancellationToken);
             LauncherTicketPolicy.ValidateAgainstBase(releaseInfo.MinimumLauncherVersion, baseManifest.MinimumLauncherVersion);
+            migratingLegacyProtocol = baseManifest.LauncherTicketProtocol != 2;
+            if (migratingLegacyProtocol && !fullClient)
+                throw new PatchPublisherException("舊票證協定遷移必須使用完整客戶端，不能只更新 NX。");
             foreach (ManifestFile file in baseManifest.Files)
             {
                 baseFiles[file.Path] = file;
@@ -122,6 +126,10 @@ public sealed class ReleaseBuilder(ProjectContext context, SigningService signer
         List<ManifestFile> orderedManifestFiles = manifestFiles.Values
             .OrderBy(file => file.Path, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        if (migratingLegacyProtocol && !orderedManifestFiles.Any(file =>
+            file.Path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
+            (!baseFiles.TryGetValue(file.Path, out ManifestFile? old) || file.Sha256 != old.Sha256)))
+            throw new PatchPublisherException("舊票證協定遷移必須交付已更新的遊戲 EXE，不能只修改協定欄位。");
         List<string> deletePaths = releaseInfo.Delete
             .Select(PathPolicy.NormalizeInstallPath)
             .Distinct(StringComparer.OrdinalIgnoreCase)
