@@ -1,83 +1,32 @@
 # 發布快速指南
 
-**2026-09-26：UI 新建版本已支援完整客戶端。** 請選擇包含 EXE、DLL、NX 的客戶端根目錄，依 [完整客戶端操作說明](FULL_CLIENT_PUBLISHING.md) 設定排除與保留規則。下方原本的 NX 命令列範例保留供舊版本維護；新版本 CLI 需加 `--full-client`。
+新版本統一發布完整客戶端。來源必須包含支援新登入流程的新版 `NovaStory.exe`、DLL、NX 與必要子目錄；不要選只有 NX 的目錄。
 
-首次設定 R2 環境變數後執行一次：
+## 第一次使用
 
-```powershell
-cd F:\MSPrivate\GamePatchDepot
-.\setup-credentials.ps1
-```
-
-之後的命令會自動讀取 Windows DPAPI 加密憑證，不需要重複輸入環境變數。
-
-日常操作可直接開啟：
-
-```powershell
-.\dist\win-x64\PatchManager.exe
-```
-
-CLI 保留作為自動化、救援與除錯用途。
-
-UI 右上角的「操作說明」包含完整流程；每個欄位旁的 `?` 可用滑鼠停留查看填寫範例。「建立退版」可選擇舊版本並自動產生新版本號。按鈕會依 Candidate、Manifest、深度驗證與 Test 狀態自動啟用，避免跳步發布。
-
-**Prepare 會先讓你確認檔案。** 選好完整客戶端資料夾後按 Prepare，在清單裡取消不想發布的項目，再按「確認並建立 Candidate」。未改動的遊戲檔案保持勾選即可，不會重複複製。取消勾選不會刪除玩家檔案；要刪除舊檔，另外勾「從新版移除」。取消確認視窗不會建立版本。
-
-關閉 UI 不會取消版本。下次開啟時，系統會自動找到最新的未完成版本，並還原 Release ID、Content Version、來源資料夾、UI 替換檔與更新說明。已完成的 R2 深度驗證也會以 Manifest 雜湊確認後還原；驗證報告必須為新版 `schemaVersion: 2`，舊紀錄需重新驗證。新版會確認本機與遠端 Manifest 完全一致，再下載核對分塊及完整檔案的 SHA-256。
+- 依環境設定 R2 憑證後，執行一次 `./setup-credentials.ps1`；之後使用 Windows DPAPI 保存的憑證。
+- 開啟 `./dist/win-x64/PatchManager.exe`。
+- 先發布支援新交接的 NovaLink。首次遊戲發布／遷移時，「最低 NovaLink 版本」填該實際已發布版本，必須高於不支援的 1.1.0。
 
 ## 每次正式發布
 
-```text
-Prepare
-  ↓
-Build
-  ↓
-Verify --local
-  ↓
-Diff
-  ↓
-Upload
-  ↓
-Verify --deep
-  ↓
-Promote test
-  ↓
-玩家更新與遊戲測試
-  ↓
-Promote stable
-  ↓
-監看 30～60 分鐘
-```
+1. 使用新的 Release ID，選擇完整客戶端目錄並填更新說明。
+2. 若舊版只有 NX，勾「建立新完整基準」，來源選本次已驗證的新編譯產物；一般更新不用勾。
+3. 按 Prepare，確認收錄清單。沒變更的遊戲檔案保持收錄，不會重複複製；不想發布的取消收錄，要移除舊檔時另勾「從新版移除」。
+4. Build，完成本機驗證與 Diff；第一版沒有舊版本時略過 Diff。
+5. Upload，通過 R2 深度驗證後發布 Test。
+6. 實機確認更新、啟動、登入、選角及進入地圖正常。
+7. 最後才發布 Stable，並監看上線情況。
 
-範例：
+舊 NX 模式與舊票證協定不再發布，也不能回滾啟用。UI 會排除不支援的回滾目標。後續最低啟動器版本可留空沿用相容基準，不能低於基準要求。
 
-```powershell
-cd F:\MSPrivate\GamePatchDepot
+CLI 自動化與完整收錄規則請使用 [完整客戶端發布操作](FULL_CLIENT_PUBLISHING.md#cli-範例) 的範例；每次 Prepare 都要加 `--full-client`，首次發布／遷移需提供 `--minimum-launcher-version`。
 
-.\patch.ps1 prepare --release 2026.09.23.1 --content-version 1008 --source F:\MSPrivate\NoLifeWzToNx\wz\n --replace UI.nx=F:\MSPrivate\NoLifeWzToNx\wz\UI40.nx --description "更新 UI 資源"
-.\patch.ps1 build --release 2026.09.23.1
-.\patch.ps1 verify --release 2026.09.23.1 --local
-.\patch.ps1 diff --release 2026.09.23.1 --against stable
-.\patch.ps1 upload --release 2026.09.23.1
-.\patch.ps1 verify --release 2026.09.23.1 --deep
-.\patch.ps1 promote --release 2026.09.23.1 --channel test
-.\patch.ps1 promote --release 2026.09.23.1 --channel stable
-.\patch.ps1 status
-```
+## 發布前確認
 
-## 發布前必查
-
-```text
-[ ] Release ID 沒有使用過
-[ ] contentVersion 比目前 Stable 大
-[ ] Candidate 只含相較發布基準有變更的 NX，且沒有未允許檔案
-[ ] Diff 只有預期的變更
-[ ] 本機 Verify 通過
-[ ] R2 Deep Verify 通過
-[ ] Test 頻道更新成功
-[ ] 遊戲啟動、登入、選角與進入地圖正常
-[ ] 最後才切換 Stable
-```
+- Release ID 未使用過，Content Version 高於目前頻道。
+- 差異只包含預期內容，本機與 R2 深度驗證都通過。
+- Test 的實際遊戲流程正常，再發布 Stable。
 
 ## 發生問題時
 

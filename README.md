@@ -199,113 +199,13 @@ $env:PATCH_R2_ENDPOINT = "https://<account-id>.r2.cloudflarestorage.com"
 
 加密檔只能由同一臺 Windows、同一個使用者解開，不會存入專案或 Git。之後一律使用 `.\patch.ps1`，不需要再次設定環境變數。
 
-## 舊版 NX 命令列流程
+## 發布流程
 
-新版本請優先使用 UI 或 [完整客戶端流程](docs/FULL_CLIENT_PUBLISHING.md)。以下是不加 `--full-client` 的舊版相容用法。
+日常操作使用 [快速指南](docs/QUICKSTART.md)；CLI 自動化請照 [完整客戶端發布操作](docs/FULL_CLIENT_PUBLISHING.md#cli-範例)，只保留這一份命令範例。
 
-假設：
-
-- 目前正式來源在 `F:\MSPrivate\NoLifeWzToNx\wz\n`。
-- 本次以 `UI40.nx` 取代玩家的 `UI.nx`。
-- 新版本為 `2026.09.23.1`。
-- contentVersion 為 `1008`。
-
-### 1. Prepare
-
-```powershell
-.\patch.ps1 prepare `
-  --release 2026.09.23.1 `
-  --content-version 1008 `
-  --base 2026.09.07.1 `
-  --source F:\MSPrivate\NoLifeWzToNx\wz\n `
-  --replace UI.nx=F:\MSPrivate\NoLifeWzToNx\wz\UI40.nx `
-  --description "更新 UI 資源"
-```
-
-Prepare 會以 `--base` 的已簽章 Manifest 比對 SHA-256，Candidate 只複製有變更的 NX；Build 再把未變更的舊檔案與本次變更合成完整 Manifest。若是第一版而沒有 `--base`，才會複製全部 NX。來源目錄不會被修改。
-
-### 2. Build
-
-```powershell
-.\patch.ps1 build `
-  --release 2026.09.23.1
-```
-
-### 3. 本機驗證
-
-```powershell
-.\patch.ps1 verify `
-  --release 2026.09.23.1 `
-  --local
-```
-
-### 4. 查看差異
-
-第一次發布尚無 stable：
-
-```powershell
-.\patch.ps1 diff `
-  --release 2026.09.23.1 `
-  --against none
-```
-
-已有 stable：
-
-```powershell
-.\patch.ps1 diff `
-  --release 2026.09.23.1 `
-  --against stable
-```
-
-### 5. 上傳 R2
-
-```powershell
-.\patch.ps1 upload `
-  --release 2026.09.23.1
-```
-
-上傳可以安全重跑。已存在且大小一致的內容會跳過。
-
-### 6. 驗證 R2
-
-快速檢查所有物件存在與大小：
-
-```powershell
-.\patch.ps1 verify `
-  --release 2026.09.23.1
-```
-
-正式發布前，先驗證本機與 R2 Manifest 的簽章並確認兩份清單完全一致，再從 R2 下載所有 chunks，核對分塊及完整檔案的 SHA-256 與大小：
-
-```powershell
-.\patch.ps1 verify `
-  --release 2026.09.23.1 `
-  --deep
-```
-
-### 7. 發布 Test
-
-```powershell
-.\patch.ps1 promote `
-  --release 2026.09.23.1 `
-  --channel test
-```
-
-### 8. 發布 Stable
-
-確認 Test 測試完成後：
-
-```powershell
-.\patch.ps1 promote `
-  --release 2026.09.23.1 `
-  --channel stable
-```
-
-### 9. 查看狀態
-
-```powershell
-.\patch.ps1 status
-```
+- 新發布必須包含遊戲主程式，使用 `prepare --full-client`，首次發布／遷移需填相容的最低 NovaLink 版本。
+- 舊 NX 清單僅供歷史查驗，不能直接發布或作為遷移／回滾基準；請以已驗證的新編譯產物建立新完整基準。
+- 依 Prepare → Build → 本機驗證／Diff → Upload → 深度驗證 → Test → 遊戲驗收 → Stable 執行；既有分塊可重用。
 
 ## 回滾
 

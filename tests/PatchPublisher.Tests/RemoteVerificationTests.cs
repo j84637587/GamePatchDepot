@@ -14,6 +14,35 @@ public sealed partial class RemoteVerificationTests
     private const string ReleaseId = "2026.09.26.1";
 
     [Fact]
+    public async Task CurrentLegacyChannelCanRepairHistoryWithoutSwitchingOrReenablingIt()
+    {
+        await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
+        FakeS3Client client = await SeedAsync(project);
+        await project.MarkAsLegacyProtocolAsync(ReleaseId, nxOnly: true);
+        byte[] manifest = await File.ReadAllBytesAsync(project.Context.ManifestPath(ReleaseId));
+        client.Objects[ObjectKeys.ForManifest(ReleaseId)] = manifest;
+        client.Objects[ObjectKeys.ForManifestSignature(ReleaseId)] = await File.ReadAllBytesAsync(project.Context.ManifestSignaturePath(ReleaseId));
+        ChannelPayload current = new()
+        {
+            Channel = "test", Generation = 1, ReleaseId = ReleaseId, ContentVersion = 1,
+            ManifestKey = ObjectKeys.ForManifest(ReleaseId), ManifestSha256 = FileUtilities.Sha256Hex(manifest),
+            PublishedAt = DateTimeOffset.UtcNow
+        };
+        byte[] envelope = SignedEnvelopeService.Create(current, PatchJsonContext.Default.ChannelPayload, project.Signer);
+        client.Objects[ObjectKeys.ForChannel("test")] = envelope;
+        await using R2ObjectStore store = new(client, "test-bucket");
+        RemoteReleaseService service = Service(project, store);
+        var repaired = await service.PromoteAsync(ReleaseId, "test");
+        Assert.Equal(1, repaired.Generation);
+        Assert.Equal(envelope, client.Objects[ObjectKeys.ForChannel("test")]);
+        Assert.Equal(envelope, client.Objects[ObjectKeys.ForChannelHistory("test", 1)]);
+        await service.PromoteAsync(ReleaseId, "test");
+        var error = await Assert.ThrowsAsync<PatchPublisherException>(() => service.PromoteAsync(ReleaseId, "stable"));
+        Assert.Contains("舊票證協定", error.Message);
+        Assert.False(client.Objects.ContainsKey(ObjectKeys.ForChannel("stable")));
+    }
+
+    [Fact]
     public async Task LegacyHistoryCanBeVerifiedButCannotBePromotedOrRolledBack()
     {
         await using TestProject project = await TestProject.CreateAsync(["UI.nx"]);
