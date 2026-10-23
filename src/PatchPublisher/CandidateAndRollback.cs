@@ -20,6 +20,8 @@ public sealed class CandidatePreparer(ProjectContext context, ReleaseCatalog cat
     {
         if (launcherTicketProtocol is not null and not 2)
             throw new PatchPublisherException("舊票證協定已移除，僅支援 launcherTicketProtocol 2。");
+        if (!fullClient)
+            throw new PatchPublisherException("新發布必須使用完整客戶端（--full-client）；舊 NX 清單只供歷史查驗。");
         context.EnsureDirectories();
         if (contentVersion <= 0)
         {
@@ -273,6 +275,8 @@ public sealed class RollbackBuilder(ProjectContext context, SigningService signe
         (ReleaseManifest target, _, _) = await catalog.LoadVerifiedAsync(targetReleaseId, cancellationToken);
         if (target.LauncherTicketProtocol != 2)
             throw new PatchPublisherException("此回滾目標使用已移除的舊票證協定，請選擇支援新交接的版本。");
+        if (target.SchemaVersion != 2 || !target.Files.Any(file => string.Equals(file.Path, context.Config.GameExecutable, StringComparison.OrdinalIgnoreCase)))
+            throw new PatchPublisherException("回滾目標必須是包含遊戲主程式的完整客戶端版本。");
         LauncherTicketPolicy.ValidateMinimumVersion(target.MinimumLauncherVersion);
         if (newContentVersion <= target.ContentVersion)
         {

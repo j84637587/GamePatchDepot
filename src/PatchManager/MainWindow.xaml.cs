@@ -1172,7 +1172,8 @@ public partial class MainWindow : Window
                 if (contentVersion < newContentVersion)
                 {
                     int schemaVersion = document.RootElement.GetProperty("schemaVersion").GetInt32();
-                    releases.Add(new RollbackReleaseOption(releaseId, contentVersion, schemaVersion == 2));
+                    if (schemaVersion == 2)
+                        releases.Add(new RollbackReleaseOption(releaseId, contentVersion, true));
                 }
             }
             catch (JsonException)
